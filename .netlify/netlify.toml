@@ -12,11 +12,11 @@ package = "@netlify/plugin-nextjs"
 [plugins.inputs]
 
 [build]
-publish = "C:\\Users\\heyzo\\clawd\\projects\\darkcity"
+publish = "C:\\Users\\heyzo\\clawd\\darkcity-game\\frontend"
 publishOrigin = "default"
 commandOrigin = "config"
 command = "npm run build"
-base = "C:\\Users\\heyzo\\clawd\\projects\\darkcity\\frontend"
+base = "C:\\Users\\heyzo\\clawd\\darkcity-game\\frontend"
 
 [build.environment]
 
