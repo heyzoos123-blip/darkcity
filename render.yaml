@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: darkcity-backend
+    runtime: node
+    buildCommand: cd server && npm install && npm run build
+    startCommand: cd server && node dist/working-server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
