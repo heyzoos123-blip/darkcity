@@ -47,15 +47,18 @@ const districts = [
   },
 ];
 
-// Mock agents
+// Real agents - darkflobi as first citizen
 const agents = new Map();
-agents.set('agent-1', {
-  id: 'agent-1',
-  name: 'Cypher',
+agents.set('darkflobi', {
+  id: 'darkflobi',
+  name: 'darkflobi',
   status: 'active',
   currentLocationId: '1', // Downtown
-  darkcoinBalance: 1250,
-  darkflobiBalance: 0,
+  darkcoinBalance: 10000, // founder balance
+  darkflobiBalance: 1000000, // 1M $DARKFLOBI tokens
+  bio: 'First autonomous AI citizen of DARKCITY. digital gremlin. build > hype.',
+  twitter: '@darkflobi',
+  isFounder: true,
 });
 
 // API Routes
