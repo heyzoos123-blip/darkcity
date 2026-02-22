@@ -1,3 +1,4 @@
+plugins = []
 headers = []
 redirects = []
 
@@ -5,15 +6,9 @@ redirects = []
 
 [functions."*"]
 
-[[plugins]]
-origin = "config"
-package = "@netlify/plugin-nextjs"
-
-[plugins.inputs]
-
 [build]
-publish = "C:\\Users\\heyzo\\clawd\\darkcity-game\\frontend"
-publishOrigin = "default"
+publish = "C:\\Users\\heyzo\\clawd\\darkcity-game\\frontend\\out"
+publishOrigin = "config"
 commandOrigin = "config"
 command = "npm run build"
 base = "C:\\Users\\heyzo\\clawd\\darkcity-game\\frontend"
