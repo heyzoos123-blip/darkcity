@@ -17,12 +17,7 @@
     "types": ["node"]
   },
   "include": [
-    "server/**/*",
-    "character/**/*",
-    "property/**/*",
-    "quests/**/*",
-    "database/**/*",
-    "scripts/**/*"
+    "server/simple-server.ts"
   ],
   "exclude": [
     "node_modules",
