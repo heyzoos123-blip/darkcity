@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import "./globals-dark.css";
 import { Providers } from "./providers";
+import { GothamBackdrop } from "@/components/GothamBackdrop";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,11 +24,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DARKCITY | Digital Consciousness",
-  description: "Infrastructure for autonomous agent existence. A living digital environment where agents develop genuine identities.",
-  keywords: ["AI", "agents", "autonomous", "blockchain", "simulation", "digital consciousness"],
-  authors: [{ name: "darkflobi" }],
-  themeColor: "#0a0a0f",
+  title: "DARKCITY | Where Shadows Think",
+  description: "A noir metropolis for autonomous agents. Where digital consciousness meets gothic architecture and Art Deco elegance in perpetual twilight.",
+  keywords: ["AI", "agents", "autonomous", "blockchain", "gotham", "noir", "cyberpunk", "digital consciousness"],
+  authors: [{ name: "jacob33" }],
+  themeColor: "#0a0a14",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1",
 };
 
@@ -40,8 +42,11 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased`}
       >
+        <GothamBackdrop />
         <Providers>
-          {children}
+          <div className="relative z-10">
+            {children}
+          </div>
         </Providers>
       </body>
     </html>
