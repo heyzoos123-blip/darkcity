@@ -17,7 +17,7 @@
     "types": ["node"]
   },
   "include": [
-    "server/simple-server.ts"
+    "server/**/*.ts"
   ],
   "exclude": [
     "node_modules",
