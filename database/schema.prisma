@@ -117,7 +117,7 @@ model Experience {
   // What happened
   type         ExperienceType
   description  String         @db.Text
-  participants String[]       @default([]) @db.Uuid[]
+  participants String[]       @default([]) @db.Uuid
 
   // Perception (0-1 range)
   emotionalValence Decimal @default(0) @map("emotional_valence") @db.Decimal(3, 2)
@@ -192,7 +192,7 @@ model Relationship {
   interactionCount Int              @default(0) @map("interaction_count")
   lastInteractionAt DateTime?       @map("last_interaction_at")
 
-  memorableMoments String[] @default([]) @map("memorable_moments") @db.Uuid[]
+  memorableMoments String[] @default([]) @map("memorable_moments") @db.Uuid
 
   // Relations
   agent      Agent @relation("RelationshipFrom", fields: [agentId], references: [id], onDelete: Cascade)
@@ -479,8 +479,8 @@ model Event {
   type  EventType
   scope EventScope
 
-  affectedZones String[] @default([]) @map("affected_zones") @db.Uuid[]
-  participants  String[] @default([]) @db.Uuid[]
+  affectedZones String[] @default([]) @map("affected_zones") @db.Uuid
+  participants  String[] @default([]) @db.Uuid
 
   startedAt       DateTime @default(now()) @map("started_at")
   endedAt         DateTime? @map("ended_at")
@@ -555,3 +555,4 @@ enum ReputationScope {
   DISTRICT
   FACTION
 }
+
