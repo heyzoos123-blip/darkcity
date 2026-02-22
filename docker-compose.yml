@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: darkcity-db
+    environment:
+      POSTGRES_DB: darkcity
+      POSTGRES_USER: darkcity
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-darkcity_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./character/schema.sql:/docker-entrypoint-initdb.d/02-characters.sql
+      - ./property/schema.sql:/docker-entrypoint-initdb.d/03-property.sql
+      - ./quests/migrations/init.sql:/docker-entrypoint-initdb.d/04-quests.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darkcity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: darkcity-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # DARKCITY API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: darkcity-api
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://darkcity:${DB_PASSWORD:-darkcity_dev_password}@postgres:5432/darkcity
+      REDIS_URL: redis://redis:6379
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  # Rent Scheduler (Cron Jobs)
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: darkcity-scheduler
+    command: npm run scheduler
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://darkcity:${DB_PASSWORD:-darkcity_dev_password}@postgres:5432/darkcity
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 3D World Viewer (Static Site)
+  viewer:
+    image: nginx:alpine
+    container_name: darkcity-viewer
+    volumes:
+      - ./world:/usr/share/nginx/html
+      - ./viewer:/usr/share/nginx/html/viewer
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,18 @@
+DARKCITY DEPLOYMENT - SIMPLE INSTRUCTIONS
+
+1. Go to: https://app.netlify.com/drop
+2. Drag the entire "deploy" folder onto the page
+3. Wait for upload to complete
+4. Copy the Netlify URL you get (something like https://randomname.netlify.app)
+5. Go to Domain settings on that new site
+6. Remove darkcity.wtf from darkflobi.com site
+7. Add darkcity.wtf to the new DARKCITY site
+
+OR EVEN SIMPLER:
+
+1. In Netlify, click "Add new site" → "Deploy manually"
+2. Drag the "deploy" folder
+3. Once deployed, go to Domain management
+4. Add darkcity.wtf as custom domain
+
+That's it - DARKCITY goes live! 💀

@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: darkcity-postgres
+    environment:
+      POSTGRES_USER: darkcity
+      POSTGRES_PASSWORD: darkcity_dev_password
+      POSTGRES_DB: darkcity
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darkcity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - darkcity
+
+  # Redis for caching and pub/sub
+  redis:
+    image: redis:7-alpine
+    container_name: darkcity-redis
+    command: redis-server --appendonly yes --requirepass darkcity_redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - darkcity
+
+  # Qdrant for vector search (optional)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: darkcity-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - darkcity
+
+  # PgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: darkcity-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@darkcity.io
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - darkcity
+    profiles:
+      - tools
+
+  # Redis Commander for Redis management (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: darkcity-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:darkcity_redis_password
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - darkcity
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+
+networks:
+  darkcity:
+    driver: bridge

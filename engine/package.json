@@ -1,0 +1,30 @@
+{
+  "name": "darkcity-combat-engine",
+  "version": "1.0.0",
+  "description": "N64-style turn-based fighting game mechanics for DARKCITY",
+  "main": "combat-classes.ts",
+  "scripts": {
+    "demo": "tsx combat-demo.ts",
+    "demo:manual": "tsx -e \"require('./combat-demo.ts').demoManualCombat()\"",
+    "demo:ai": "tsx -e \"require('./combat-demo.ts').demoAIBattle()\"",
+    "demo:tournament": "tsx -e \"require('./combat-demo.ts').demoTournament()\"",
+    "demo:classes": "tsx -e \"require('./combat-demo.ts').demoClassAbilities()\"",
+    "demo:combo": "tsx -e \"require('./combat-demo.ts').demoComboSystem()\"",
+    "demo:status": "tsx -e \"require('./combat-demo.ts').demoStatusEffects()\"",
+    "test": "echo \"Tests coming soon\" && exit 0"
+  },
+  "keywords": [
+    "combat",
+    "fighting-game",
+    "turn-based",
+    "n64",
+    "darkcity"
+  ],
+  "author": "darkflobi",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

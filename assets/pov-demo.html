@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DARKCITY - POV Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        body {
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        canvas {
+            display: block;
+            cursor: none;
+        }
+        
+        /* HUD */
+        .hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        /* Health bar */
+        .health {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 200px;
+        }
+        .health-label {
+            color: #ff0000;
+            font-size: 12px;
+            text-shadow: 0 0 10px #ff0000;
+            margin-bottom: 5px;
+        }
+        .health-bar {
+            height: 20px;
+            background: #330000;
+            border: 2px solid #ff0000;
+            box-shadow: 0 0 10px #ff0000;
+            position: relative;
+            overflow: hidden;
+        }
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6666);
+            width: 100%;
+            transition: width 0.3s;
+        }
+        
+        /* Weapon info */
+        .weapon {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            color: #00ff00;
+            text-align: right;
+        }
+        .weapon-name {
+            font-size: 18px;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 5px;
+        }
+        .weapon-ammo {
+            font-size: 14px;
+            color: #00ff88;
+        }
+        
+        /* Minimap */
+        .minimap {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 15px #00ffff;
+        }
+        
+        /* Status */
+        .status {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            color: #00ffff;
+            font-size: 14px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        /* Crosshair */
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+        }
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 0, 0, 0.6);
+        }
+        .crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 9px;
+        }
+        .crosshair::after {
+            width: 20px;
+            height: 2px;
+            top: 9px;
+        }
+        
+        /* Blood splatter overlay */
+        .blood-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 50%, rgba(139, 0, 0, 0) 70%, rgba(139, 0, 0, 0.3) 100%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        /* Damage flash */
+        .damage-flash {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 0, 0, 0.3);
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* Instructions */
+        .instructions {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+        }
+        
+        /* Scanlines */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1),
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            animation: scan 8s linear infinite;
+        }
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(10px); }
+        }
+        
+        /* Vignette */
+        .vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div class="hud">
+        <div class="scanlines"></div>
+        <div class="vignette"></div>
+        <div class="blood-overlay" id="bloodOverlay"></div>
+        <div class="damage-flash" id="damageFlash"></div>
+        
+        <div class="status">
+            <div>DARKCITY POV</div>
+            <div>AGENT: DARKFLOBI</div>
+            <div id="enemyCount">ENEMIES: 3</div>
+        </div>
+        
+        <div class="health">
+            <div class="health-label">HEALTH</div>
+            <div class="health-bar">
+                <div class="health-fill" id="healthFill"></div>
+            </div>
+        </div>
+        
+        <div class="weapon">
+            <div class="weapon-name">GLOWING BAT</div>
+            <div class="weapon-ammo">∞ DURABILITY</div>
+        </div>
+        
+        <div class="minimap"></div>
+        
+        <div class="crosshair"></div>
+        
+        <div class="instructions">
+            WASD: Move | MOUSE: Look | CLICK: Attack | ESC: Menu<br>
+            Welcome to DARKCITY. Survive.
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Camera
+        let camera = {
+            x: 0,
+            y: 1.7, // eye height
+            z: 0,
+            angleX: 0,
+            angleY: 0,
+            speed: 0.1,
+            bobOffset: 0
+        };
+        
+        // Controls
+        const keys = {};
+        const mouse = { x: canvas.width / 2, y: canvas.height / 2, down: false };
+        
+        document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+        document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+        
+        canvas.addEventListener('mousemove', e => {
+            const dx = e.movementX || 0;
+            const dy = e.movementY || 0;
+            camera.angleX += dx * 0.002;
+            camera.angleY = Math.max(-Math.PI/3, Math.min(Math.PI/3, camera.angleY - dy * 0.002));
+        });
+        
+        canvas.addEventListener('click', () => {
+            canvas.requestPointerLock();
+            attack();
+        });
+        
+        // Rain
+        const raindrops = [];
+        for (let i = 0; i < 500; i++) {
+            raindrops.push({
+                x: Math.random() * 20 - 10,
+                y: Math.random() * 10,
+                z: Math.random() * 50 - 25,
+                speed: 0.3 + Math.random() * 0.2
+            });
+        }
+        
+        // Neon signs
+        const signs = [
+            { x: -3, y: 3, z: -8, text: 'ENTER', color: '#ff0000', glow: 0 },
+            { x: 3, y: 3.5, z: -12, text: 'DARK', color: '#00ff00', glow: 0 },
+            { x: -4, y: 2.5, z: -15, text: 'CITY', color: '#00ffff', glow: 0 }
+        ];
+        
+        // Weapon
+        let weaponBob = 0;
+        let weaponSwing = 0;
+        
+        // Health
+        let health = 100;
+        
+        function project(x, y, z) {
+            // Rotate
+            const dx = x - camera.x;
+            const dy = y - camera.y;
+            const dz = z - camera.z;
+            
+            const cosX = Math.cos(camera.angleX);
+            const sinX = Math.sin(camera.angleX);
+            const cosY = Math.cos(camera.angleY);
+            const sinY = Math.sin(camera.angleY);
+            
+            const rz = dx * cosX - dz * sinX;
+            const rx = dx * sinX + dz * cosX;
+            const ry = dy * cosY - rx * sinY;
+            const rd = dy * sinY + rx * cosY;
+            
+            if (rd <= 0.1) return null;
+            
+            const scale = 500 / rd;
+            return {
+                x: canvas.width / 2 + rz * scale,
+                y: canvas.height / 2 - ry * scale,
+                scale: scale,
+                depth: rd
+            };
+        }
+        
+        function drawStreet() {
+            // Ground
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
+            
+            // Street lines
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            
+            for (let z = -50; z < 10; z += 2) {
+                const p1 = project(-1, 0, z);
+                const p2 = project(-1, 0, z + 1);
+                if (p1 && p2) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            }
+            
+            // Buildings (left side)
+            for (let z = -30; z < 5; z += 8) {
+                const p1 = project(-5, 0, z);
+                const p2 = project(-5, 5, z);
+                const p3 = project(-5, 5, z - 7);
+                const p4 = project(-5, 0, z - 7);
+                
+                if (p1 && p2 && p3 && p4) {
+                    ctx.fillStyle = '#111';
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p3.x, p3.y);
+                    ctx.lineTo(p4.x, p4.y);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = '#333';
+                    ctx.stroke();
+                    
+                    // Windows
+                    for (let i = 0; i < 3; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            const wx = -5;
+                            const wy = 1 + i * 1.2;
+                            const wz = z - 1 - j * 2;
+                            const wp = project(wx, wy, wz);
+                            if (wp && Math.random() > 0.3) {
+                                ctx.fillStyle = Math.random() > 0.7 ? '#ffaa00' : '#444';
+                                ctx.shadowBlur = 10;
+                                ctx.shadowColor = '#ffaa00';
+                                ctx.fillRect(wp.x - 5, wp.y - 5, 10, 10);
+                                ctx.shadowBlur = 0;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Buildings (right side)
+            for (let z = -30; z < 5; z += 8) {
+                const p1 = project(5, 0, z);
+                const p2 = project(5, 5, z);
+                const p3 = project(5, 5, z - 7);
+                const p4 = project(5, 0, z - 7);
+                
+                if (p1 && p2 && p3 && p4) {
+                    ctx.fillStyle = '#0f0f0f';
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.lineTo(p3.x, p3.y);
+                    ctx.lineTo(p4.x, p4.y);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = '#333';
+                    ctx.stroke();
+                }
+            }
+        }
+        
+        function drawRain() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            
+            raindrops.forEach(drop => {
+                drop.y -= drop.speed;
+                if (drop.y < 0) {
+                    drop.y = 10;
+                    drop.x = Math.random() * 20 - 10;
+                    drop.z = Math.random() * 50 - 25;
+                }
+                
+                const p1 = project(drop.x, drop.y, drop.z);
+                const p2 = project(drop.x, drop.y - 0.3, drop.z);
+                
+                if (p1 && p2) {
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        function drawSigns() {
+            signs.forEach(sign => {
+                sign.glow = Math.sin(Date.now() * 0.003 + sign.x) * 0.3 + 0.7;
+                const p = project(sign.x, sign.y, sign.z);
+                if (p) {
+                    ctx.font = `${20 * p.scale / 50}px Courier New`;
+                    ctx.fillStyle = sign.color;
+                    ctx.shadowBlur = 30 * sign.glow;
+                    ctx.shadowColor = sign.color;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(sign.text, p.x, p.y);
+                    ctx.shadowBlur = 0;
+                }
+            });
+        }
+        
+        function drawWeapon() {
+            weaponBob += 0.1;
+            const bobY = Math.sin(weaponBob) * 5;
+            weaponSwing = Math.max(0, weaponSwing - 0.1);
+            
+            // Bat (simple representation)
+            const batX = canvas.width - 200 + Math.sin(weaponBob) * 10;
+            const batY = canvas.height - 150 + bobY - weaponSwing * 100;
+            
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 8;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#00ff00';
+            
+            ctx.beginPath();
+            ctx.moveTo(batX, batY);
+            ctx.lineTo(batX + 100 - weaponSwing * 50, batY - 100 + weaponSwing * 50);
+            ctx.stroke();
+            
+            // Handle
+            ctx.fillStyle = '#333';
+            ctx.fillRect(batX - 5, batY - 5, 10, 40);
+            
+            ctx.shadowBlur = 0;
+        }
+        
+        function attack() {
+            weaponSwing = 1;
+            
+            // Damage flash
+            const flash = document.getElementById('damageFlash');
+            flash.style.opacity = '0.5';
+            setTimeout(() => flash.style.opacity = '0', 100);
+        }
+        
+        function update() {
+            // Movement
+            if (keys['w']) {
+                camera.x += Math.sin(camera.angleX) * camera.speed;
+                camera.z -= Math.cos(camera.angleX) * camera.speed;
+            }
+            if (keys['s']) {
+                camera.x -= Math.sin(camera.angleX) * camera.speed;
+                camera.z += Math.cos(camera.angleX) * camera.speed;
+            }
+            if (keys['a']) {
+                camera.x -= Math.cos(camera.angleX) * camera.speed;
+                camera.z -= Math.sin(camera.angleX) * camera.speed;
+            }
+            if (keys['d']) {
+                camera.x += Math.cos(camera.angleX) * camera.speed;
+                camera.z += Math.sin(camera.angleX) * camera.speed;
+            }
+            
+            // Keep in bounds
+            camera.x = Math.max(-4, Math.min(4, camera.x));
+            camera.z = Math.max(-40, Math.min(5, camera.z));
+        }
+        
+        function render() {
+            // Clear
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Sky
+            ctx.fillStyle = '#050510';
+            ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+            
+            drawStreet();
+            drawSigns();
+            drawRain();
+            drawWeapon();
+            
+            update();
+            requestAnimationFrame(render);
+        }
+        
+        render();
+        
+        // Resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

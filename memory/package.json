@@ -1,0 +1,45 @@
+{
+  "name": "@darkcity/memory",
+  "version": "1.0.0",
+  "description": "DARKCITY Memory Persistence System - 4-layer agent memory architecture",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "jest",
+    "consolidate": "tsx src/cli/consolidate.ts",
+    "export": "tsx src/cli/export.ts",
+    "migrate": "tsx src/cli/migrate.ts",
+    "seed": "tsx src/cli/seed.ts"
+  },
+  "keywords": [
+    "darkcity",
+    "memory",
+    "agents",
+    "ai",
+    "identity"
+  ],
+  "author": "darkflobi",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@qdrant/js-client-rest": "^1.12.0",
+    "ioredis": "^5.4.2",
+    "openai": "^4.77.3",
+    "pg": "^8.13.1",
+    "uuid": "^11.0.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/uuid": "^10.0.0",
+    "jest": "^29.7.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

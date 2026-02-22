@@ -1,0 +1,35 @@
+{
+  "name": "@darkcity/quests",
+  "version": "1.0.0",
+  "description": "DARKCITY Quest System - Agents earn SOL through quests",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/api/server.ts",
+    "start": "node dist/api/server.js",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "admin": "tsx src/admin/cli.ts"
+  },
+  "keywords": ["darkcity", "quests", "solana", "agents"],
+  "author": "darkflobi",
+  "license": "MIT",
+  "dependencies": {
+    "@solana/web3.js": "^1.87.6",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "better-sqlite3": "^9.2.2",
+    "zod": "^3.22.4",
+    "nanoid": "^5.0.4",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "@darkcity/battle-server",
+  "version": "1.0.0",
+  "description": "DARKCITY Battle Server - Integrated combat engine, API, and matchmaking",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint . --ext .ts",
+    "example": "tsx example-agent-client.ts"
+  },
+  "keywords": [
+    "darkcity",
+    "battle",
+    "combat",
+    "matchmaking",
+    "agent",
+    "api",
+    "game-server"
+  ],
+  "author": "darkflobi",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "ws": "^8.16.0",
+    "tweetnacl": "^1.0.3",
+    "bs58": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.5",
+    "@types/ws": "^8.5.10",
+    "@types/jest": "^29.5.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "jest": "^29.5.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

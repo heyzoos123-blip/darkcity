@@ -1,0 +1,35 @@
+{
+  "name": "@darkcity/nexus-hub",
+  "version": "1.0.0",
+  "description": "Gothic N64-style 3D city hub for DARKCITY agent ecosystem",
+  "type": "module",
+  "main": "nexus-hub.js",
+  "exports": {
+    ".": "./nexus-hub.js",
+    "./init": "./nexus-init.js"
+  },
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "serve": "npx serve .",
+    "demo": "open nexus-demo.html"
+  },
+  "keywords": [
+    "darkcity",
+    "threejs",
+    "3d",
+    "gothic",
+    "n64",
+    "game",
+    "hub",
+    "virtual-world"
+  ],
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "author": "darkflobi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/darkcity"
+  }
+}

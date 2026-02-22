@@ -1,0 +1,664 @@
+// DARKCITY Database Schema
+// Comprehensive persistence layer for all game systems
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CHARACTER SYSTEM
+// ============================================================================
+
+model Character {
+  id            String   @id @default(cuid())
+  userId        String   @unique // Agent/player identifier
+  name          String
+  class         CharacterClass
+  level         Int      @default(1)
+  experience    BigInt   @default(0)
+  
+  // Core Stats
+  health        Int      @default(100)
+  maxHealth     Int      @default(100)
+  energy        Int      @default(100)
+  maxEnergy     Int      @default(100)
+  
+  // Primary Attributes
+  strength      Int      @default(10)
+  dexterity     Int      @default(10)
+  intelligence  Int      @default(10)
+  charisma      Int      @default(10)
+  luck          Int      @default(10)
+  
+  // Appearance
+  appearance    Json     // {hairStyle, hairColor, skinTone, outfit, accessories}
+  
+  // Location
+  currentZone   String   @default("downtown")
+  positionX     Float    @default(0)
+  positionY     Float    @default(0)
+  positionZ     Float    @default(0)
+  
+  // Status
+  isOnline      Boolean  @default(false)
+  lastSeen      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relationships
+  inventory     InventoryItem[]
+  wallets       Wallet[]
+  properties    Property[]
+  quests        QuestProgress[]
+  combatStats   CombatStats?
+  combatHistory CombatReplay[]
+  relationships Relationship[] @relation("CharacterFrom")
+  relationshipsTo Relationship[] @relation("CharacterTo")
+  achievements  Achievement[]
+  skills        CharacterSkill[]
+  
+  @@index([userId])
+  @@index([class])
+  @@index([level])
+  @@index([currentZone])
+}
+
+enum CharacterClass {
+  HACKER
+  MERCENARY
+  FIXER
+  NETRUNNER
+  STREET_SAMURAI
+  CORPORATE
+  NOMAD
+}
+
+model CharacterSkill {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  skillName   String
+  level       Int       @default(1)
+  experience  Int       @default(0)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([characterId, skillName])
+  @@index([characterId])
+}
+
+// ============================================================================
+// INVENTORY & ITEMS
+// ============================================================================
+
+model Item {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  type        ItemType
+  rarity      ItemRarity
+  
+  // Stats/Effects
+  stats       Json     // {damage, defense, speed, etc.}
+  effects     Json     // {buffs, debuffs, special abilities}
+  
+  // Economy
+  baseValue   Int      @default(0)
+  
+  // Metadata
+  imageUrl    String?
+  craftable   Boolean  @default(false)
+  tradeable   Boolean  @default(true)
+  stackable   Boolean  @default(false)
+  maxStack    Int      @default(1)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relationships
+  inventory   InventoryItem[]
+  craftingRecipes CraftingRecipe[] @relation("RecipeOutput")
+  craftingMaterials CraftingMaterial[]
+  
+  @@index([type])
+  @@index([rarity])
+}
+
+enum ItemType {
+  WEAPON
+  ARMOR
+  ACCESSORY
+  CONSUMABLE
+  MATERIAL
+  QUEST_ITEM
+  CYBERWARE
+  VEHICLE
+  BLUEPRINT
+}
+
+enum ItemRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+  MYTHIC
+}
+
+model InventoryItem {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        Item      @relation(fields: [itemId], references: [id])
+  
+  quantity    Int       @default(1)
+  equipped    Boolean   @default(false)
+  slot        String?   // Equipment slot if equipped
+  
+  // Item instance data (for unique items)
+  instanceData Json?    // {durability, modifications, sockets}
+  
+  acquiredAt  DateTime  @default(now())
+  
+  @@index([characterId])
+  @@index([itemId])
+  @@index([equipped])
+}
+
+model CraftingRecipe {
+  id          String   @id @default(cuid())
+  name        String
+  outputItemId String
+  outputItem  Item     @relation("RecipeOutput", fields: [outputItemId], references: [id])
+  outputQuantity Int   @default(1)
+  
+  requiredLevel Int    @default(1)
+  craftingTime  Int    @default(60) // seconds
+  
+  materials   CraftingMaterial[]
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([outputItemId])
+}
+
+model CraftingMaterial {
+  id        String         @id @default(cuid())
+  recipeId  String
+  recipe    CraftingRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item           @relation(fields: [itemId], references: [id])
+  quantity  Int
+  
+  @@index([recipeId])
+}
+
+// ============================================================================
+// WALLET & TRANSACTIONS
+// ============================================================================
+
+model Wallet {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  // Currency type (SOL, USDC, game tokens, etc.)
+  currency    String
+  
+  // Solana address for crypto
+  address     String?
+  
+  // Balance
+  balance     BigInt    @default(0)
+  
+  // Metadata
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relationships
+  transactionsFrom Transaction[] @relation("WalletFrom")
+  transactionsTo   Transaction[] @relation("WalletTo")
+  
+  @@unique([characterId, currency])
+  @@index([currency])
+  @@index([address])
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  
+  fromWalletId String?
+  fromWallet  Wallet?  @relation("WalletFrom", fields: [fromWalletId], references: [id])
+  
+  toWalletId  String?
+  toWallet    Wallet?  @relation("WalletTo", fields: [toWalletId], references: [id])
+  
+  amount      BigInt
+  currency    String
+  
+  type        TransactionType
+  status      TransactionStatus @default(PENDING)
+  
+  // Blockchain data
+  signature   String?  @unique // Solana transaction signature
+  blockTime   DateTime?
+  
+  // Metadata
+  description String?
+  metadata    Json?    // {questId, itemId, propertyId, etc.}
+  
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  
+  @@index([fromWalletId])
+  @@index([toWalletId])
+  @@index([signature])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum TransactionType {
+  TRANSFER
+  PURCHASE
+  SALE
+  QUEST_REWARD
+  COMBAT_REWARD
+  PROPERTY_RENT
+  CRAFTING_FEE
+  MARKETPLACE_FEE
+  AIRDROP
+  SYSTEM
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+// ============================================================================
+// PROPERTY SYSTEM
+// ============================================================================
+
+model Property {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  
+  ownerId     String
+  owner       Character @relation(fields: [ownerId], references: [id])
+  
+  // Location
+  zone        String
+  address     String
+  coordinates Json      // {x, y, z}
+  
+  // Property Details
+  type        PropertyType
+  size        Int       // Square footage
+  rooms       Int       @default(1)
+  
+  // Economy
+  purchasePrice BigInt
+  currentValue  BigInt
+  rentPrice     BigInt?  // Per day
+  
+  // Status
+  isRentable  Boolean   @default(false)
+  isUpgraded  Boolean   @default(false)
+  upgrades    Json?     // {security, storage, workshop, etc.}
+  
+  // Metadata
+  imageUrl    String?
+  purchasedAt DateTime  @default(now())
+  lastRentPaid DateTime?
+  
+  @@index([ownerId])
+  @@index([zone])
+  @@index([type])
+}
+
+enum PropertyType {
+  APARTMENT
+  WAREHOUSE
+  SAFEHOUSE
+  SHOP
+  OFFICE
+  PENTHOUSE
+  GARAGE
+}
+
+// ============================================================================
+// QUEST SYSTEM
+// ============================================================================
+
+model Quest {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  
+  type        QuestType
+  difficulty  QuestDifficulty
+  
+  // Requirements
+  minLevel    Int      @default(1)
+  prerequisites Json?  // {questIds, items, stats}
+  
+  // Rewards
+  rewards     Json     // {xp, credits, items, reputation}
+  
+  // Quest Data
+  objectives  Json     // Array of objectives
+  dialogue    Json?    // NPC dialogue trees
+  
+  // Metadata
+  isRepeatable Boolean @default(false)
+  cooldown    Int?     // Minutes between repeats
+  
+  createdAt   DateTime @default(now())
+  
+  // Relationships
+  progress    QuestProgress[]
+  
+  @@index([type])
+  @@index([difficulty])
+}
+
+enum QuestType {
+  MAIN_STORY
+  SIDE_QUEST
+  DAILY
+  WEEKLY
+  EVENT
+  BOUNTY
+}
+
+enum QuestDifficulty {
+  TRIVIAL
+  EASY
+  MEDIUM
+  HARD
+  EXTREME
+  LEGENDARY
+}
+
+model QuestProgress {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  questId     String
+  quest       Quest     @relation(fields: [questId], references: [id])
+  
+  status      QuestStatus @default(IN_PROGRESS)
+  
+  // Progress tracking
+  objectives  Json      // {objectiveId: completion status}
+  
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  lastRepeat  DateTime?
+  
+  @@unique([characterId, questId])
+  @@index([characterId])
+  @@index([questId])
+  @@index([status])
+}
+
+enum QuestStatus {
+  AVAILABLE
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ABANDONED
+}
+
+// ============================================================================
+// SOCIAL & RELATIONSHIPS
+// ============================================================================
+
+model Relationship {
+  id          String    @id @default(cuid())
+  
+  fromId      String
+  from        Character @relation("CharacterFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  
+  toId        String
+  to          Character @relation("CharacterTo", fields: [toId], references: [id], onDelete: Cascade)
+  
+  type        RelationType
+  status      RelationshipStatus @default(NEUTRAL)
+  
+  // Relationship metrics
+  affinity    Int       @default(0)  // -100 to +100
+  trust       Int       @default(0)  // 0 to 100
+  
+  // Interaction history
+  lastInteraction DateTime @default(now())
+  interactions Int      @default(0)
+  
+  // Metadata
+  notes       String?
+  metadata    Json?    // {sharedQuests, trades, combats}
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([fromId, toId])
+  @@index([fromId])
+  @@index([toId])
+  @@index([type])
+}
+
+enum RelationType {
+  FRIEND
+  ALLY
+  RIVAL
+  ENEMY
+  GUILD_MEMBER
+  MENTOR
+  MENTEE
+  TRADE_PARTNER
+}
+
+enum RelationshipStatus {
+  FRIENDLY
+  NEUTRAL
+  HOSTILE
+  BLOCKED
+}
+
+// ============================================================================
+// COMBAT SYSTEM
+// ============================================================================
+
+model CombatStats {
+  id          String    @id @default(cuid())
+  characterId String    @unique
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  // Win/Loss Record
+  totalCombats Int      @default(0)
+  wins        Int      @default(0)
+  losses      Int      @default(0)
+  draws       Int      @default(0)
+  
+  // Damage Stats
+  totalDamageDealt     BigInt @default(0)
+  totalDamageTaken     BigInt @default(0)
+  highestDamage        Int    @default(0)
+  
+  // Kill Stats
+  kills       Int      @default(0)
+  deaths      Int      @default(0)
+  kdr         Float    @default(0.0)
+  
+  // Combat Rating
+  rating      Int      @default(1000) // ELO-style
+  rank        String   @default("Rookie")
+  
+  // Streak
+  currentStreak Int    @default(0)
+  bestStreak    Int    @default(0)
+  
+  updatedAt   DateTime @updatedAt
+}
+
+model CombatReplay {
+  id          String    @id @default(cuid())
+  
+  // Participants
+  attackerId  String
+  attacker    Character @relation(fields: [attackerId], references: [id])
+  defenderId  String?   // Null for PvE
+  
+  // Combat Data
+  outcome     CombatOutcome
+  duration    Int       // seconds
+  rounds      Int
+  
+  // Detailed log
+  events      Json      // Array of combat events
+  finalStats  Json      // Final HP, damage dealt, etc.
+  
+  // Rewards
+  rewards     Json?     // {xp, loot, credits}
+  
+  // Metadata
+  location    String
+  combatType  CombatType
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([attackerId])
+  @@index([defenderId])
+  @@index([combatType])
+  @@index([createdAt])
+}
+
+enum CombatOutcome {
+  VICTORY
+  DEFEAT
+  DRAW
+  FLED
+}
+
+enum CombatType {
+  PVP_DUEL
+  PVP_ARENA
+  PVE_MOB
+  PVE_BOSS
+  RAID
+  TOURNAMENT
+}
+
+// ============================================================================
+// ACHIEVEMENTS
+// ============================================================================
+
+model Achievement {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  achievementKey String
+  title       String
+  description String
+  category    String
+  
+  progress    Int       @default(0)
+  target      Int
+  completed   Boolean   @default(false)
+  
+  // Rewards
+  rewards     Json?     // {xp, title, cosmetic}
+  
+  unlockedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  
+  @@unique([characterId, achievementKey])
+  @@index([characterId])
+  @@index([completed])
+}
+
+// ============================================================================
+// MATCHMAKING & SESSIONS
+// ============================================================================
+
+model MatchmakingQueue {
+  id          String    @id @default(cuid())
+  characterId String
+  queueType   String    // arena, raid, dungeon
+  rating      Int
+  
+  preferences Json?     // {minRating, maxRating, region}
+  
+  status      QueueStatus @default(WAITING)
+  matchId     String?
+  
+  joinedAt    DateTime  @default(now())
+  expiresAt   DateTime
+  
+  @@index([queueType])
+  @@index([status])
+  @@index([joinedAt])
+}
+
+enum QueueStatus {
+  WAITING
+  MATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ActiveSession {
+  id          String    @id @default(cuid())
+  characterId String
+  
+  sessionType String    // combat, trade, quest, exploration
+  data        Json      // Session-specific data
+  
+  startedAt   DateTime  @default(now())
+  lastActivity DateTime @default(now())
+  expiresAt   DateTime
+  
+  @@index([characterId])
+  @@index([sessionType])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// SYSTEM TABLES
+// ============================================================================
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  type      String   // string, number, boolean, json
+  
+  updatedAt DateTime @updatedAt
+}
+
+model DataIntegrityLog {
+  id        String   @id @default(cuid())
+  checkType String
+  status    String   // passed, failed, warning
+  details   Json
+  
+  createdAt DateTime @default(now())
+  
+  @@index([checkType])
+  @@index([status])
+  @@index([createdAt])
+}

@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+backups
+*.log
+.git
+.gitignore
+README.md
+CHANGELOG.md
+INTEGRATION.md

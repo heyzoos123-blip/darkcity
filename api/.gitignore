@@ -1,0 +1,64 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+*.js
+*.js.map
+*.d.ts
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.production
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+coverage/
+.nyc_output/
+
+# Database
+*.sqlite
+*.db
+
+# Temp files
+tmp/
+temp/
+*.tmp
+
+# Secrets
+my-wallet.txt
+auth.json
+secrets/
+*.key
+*.pem
+
+# Docker
+docker-compose.override.yml
+
+# OpenAPI output
+openapi.json
+openapi.yaml

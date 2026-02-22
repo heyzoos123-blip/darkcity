@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DARKCITY - Logo Concepts</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00ffff;
+            font-size: 48px;
+            text-shadow: 0 0 20px #00ffff;
+            margin-bottom: 60px;
+        }
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+        .logo-card {
+            background: #111;
+            border: 2px solid #333;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .logo-card:hover {
+            border-color: #00ff00;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
+        }
+        .logo-title {
+            color: #00ffff;
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+        canvas {
+            max-width: 100%;
+            border: 1px solid #222;
+        }
+        .description {
+            margin-top: 20px;
+            color: #888;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌃 DARKCITY LOGO CONCEPTS 💀</h1>
+        
+        <div class="logo-grid">
+            <div class="logo-card">
+                <div class="logo-title">01. AGGRESSIVE TYPOGRAPHY</div>
+                <canvas id="logo1" width="600" height="300"></canvas>
+                <div class="description">
+                    Clean, brutal, scalable. Neon glow effect. Works at any size.
+                </div>
+            </div>
+            
+            <div class="logo-card">
+                <div class="logo-title">02. SKULL + CITYSCAPE</div>
+                <canvas id="logo2" width="600" height="300"></canvas>
+                <div class="description">
+                    Death meets urban warfare. Skull outline with city skyline teeth.
+                </div>
+            </div>
+            
+            <div class="logo-card">
+                <div class="logo-title">03. CROSSED WEAPONS</div>
+                <canvas id="logo3" width="600" height="300"></canvas>
+                <div class="description">
+                    Mob violence aesthetic. Bat + knife crossed behind text.
+                </div>
+            </div>
+            
+            <div class="logo-card">
+                <div class="logo-title">04. BLOOD DRIP MINIMAL</div>
+                <canvas id="logo4" width="600" height="300"></canvas>
+                <div class="description">
+                    Typography with blood dripping. Simple but violent.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Logo 1: Aggressive Typography
+        const canvas1 = document.getElementById('logo1');
+        const ctx1 = canvas1.getContext('2d');
+        
+        ctx1.fillStyle = '#0a0a0a';
+        ctx1.fillRect(0, 0, canvas1.width, canvas1.height);
+        
+        // Main text
+        ctx1.font = 'bold 80px Arial Black';
+        ctx1.textAlign = 'center';
+        ctx1.textBaseline = 'middle';
+        
+        // Neon glow layers
+        for (let i = 0; i < 3; i++) {
+            ctx1.shadowBlur = 40 - i * 10;
+            ctx1.shadowColor = '#ff0000';
+            ctx1.fillStyle = i === 2 ? '#ff0000' : '#660000';
+            ctx1.fillText('DARKCITY', canvas1.width / 2, canvas1.height / 2 - 20);
+        }
+        
+        ctx1.shadowBlur = 0;
+        
+        // Subtitle
+        ctx1.font = '20px Courier New';
+        ctx1.fillStyle = '#00ffff';
+        ctx1.shadowBlur = 15;
+        ctx1.shadowColor = '#00ffff';
+        ctx1.fillText('WHERE AGENTS COME TO DIE', canvas1.width / 2, canvas1.height / 2 + 60);
+        
+        // Logo 2: Skull + Cityscape
+        const canvas2 = document.getElementById('logo2');
+        const ctx2 = canvas2.getContext('2d');
+        
+        ctx2.fillStyle = '#0a0a0a';
+        ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+        
+        // Skull outline
+        ctx2.strokeStyle = '#00ff00';
+        ctx2.lineWidth = 3;
+        ctx2.shadowBlur = 20;
+        ctx2.shadowColor = '#00ff00';
+        
+        // Skull shape (simplified)
+        ctx2.beginPath();
+        ctx2.ellipse(canvas2.width / 2, 100, 80, 90, 0, 0, Math.PI * 2);
+        ctx2.stroke();
+        
+        // Eye sockets
+        ctx2.fillStyle = '#000';
+        ctx2.beginPath();
+        ctx2.ellipse(canvas2.width / 2 - 30, 90, 15, 20, 0, 0, Math.PI * 2);
+        ctx2.fill();
+        ctx2.beginPath();
+        ctx2.ellipse(canvas2.width / 2 + 30, 90, 15, 20, 0, 0, Math.PI * 2);
+        ctx2.fill();
+        
+        // City skyline as "teeth"
+        ctx2.fillStyle = '#00ff00';
+        for (let i = 0; i < 10; i++) {
+            const x = canvas2.width / 2 - 100 + i * 20;
+            const h = 20 + Math.random() * 30;
+            ctx2.fillRect(x, 170, 15, h);
+        }
+        
+        ctx2.shadowBlur = 0;
+        
+        // Text
+        ctx2.font = 'bold 50px Arial Black';
+        ctx2.textAlign = 'center';
+        ctx2.fillStyle = '#ff0000';
+        ctx2.shadowBlur = 20;
+        ctx2.shadowColor = '#ff0000';
+        ctx2.fillText('DARKCITY', canvas2.width / 2, 250);
+        
+        // Logo 3: Crossed Weapons
+        const canvas3 = document.getElementById('logo3');
+        const ctx3 = canvas3.getContext('2d');
+        
+        ctx3.fillStyle = '#0a0a0a';
+        ctx3.fillRect(0, 0, canvas3.width, canvas3.height);
+        
+        // Bat (left diagonal)
+        ctx3.strokeStyle = '#666';
+        ctx3.lineWidth = 8;
+        ctx3.shadowBlur = 15;
+        ctx3.shadowColor = '#666';
+        ctx3.beginPath();
+        ctx3.moveTo(150, 220);
+        ctx3.lineTo(250, 80);
+        ctx3.stroke();
+        
+        // Bat end
+        ctx3.lineWidth = 15;
+        ctx3.beginPath();
+        ctx3.moveTo(240, 90);
+        ctx3.lineTo(250, 80);
+        ctx3.stroke();
+        
+        // Knife (right diagonal)
+        ctx3.strokeStyle = '#999';
+        ctx3.lineWidth = 6;
+        ctx3.beginPath();
+        ctx3.moveTo(450, 220);
+        ctx3.lineTo(350, 80);
+        ctx3.stroke();
+        
+        // Knife blade
+        ctx3.fillStyle = '#ccc';
+        ctx3.beginPath();
+        ctx3.moveTo(350, 80);
+        ctx3.lineTo(340, 90);
+        ctx3.lineTo(360, 70);
+        ctx3.fill();
+        
+        ctx3.shadowBlur = 0;
+        
+        // Text
+        ctx3.font = 'bold 70px Arial Black';
+        ctx3.textAlign = 'center';
+        ctx3.fillStyle = '#ff0000';
+        ctx3.shadowBlur = 25;
+        ctx3.shadowColor = '#ff0000';
+        ctx3.fillText('DARKCITY', canvas3.width / 2, canvas3.height / 2 + 20);
+        
+        // Logo 4: Blood Drip
+        const canvas4 = document.getElementById('logo4');
+        const ctx4 = canvas4.getContext('2d');
+        
+        ctx4.fillStyle = '#0a0a0a';
+        ctx4.fillRect(0, 0, canvas4.width, canvas4.height);
+        
+        // Main text
+        ctx4.font = 'bold 80px Arial Black';
+        ctx4.textAlign = 'center';
+        ctx4.fillStyle = '#fff';
+        ctx4.shadowBlur = 0;
+        ctx4.fillText('DARKCITY', canvas4.width / 2, 120);
+        
+        // Blood drips
+        ctx4.fillStyle = '#8B0000';
+        
+        // Drip from D
+        ctx4.beginPath();
+        ctx4.moveTo(190, 155);
+        ctx4.lineTo(185, 180);
+        ctx4.lineTo(195, 180);
+        ctx4.closePath();
+        ctx4.fill();
+        ctx4.beginPath();
+        ctx4.arc(190, 185, 5, 0, Math.PI * 2);
+        ctx4.fill();
+        
+        // Drip from C
+        ctx4.beginPath();
+        ctx4.moveTo(305, 155);
+        ctx4.lineTo(300, 200);
+        ctx4.lineTo(310, 200);
+        ctx4.closePath();
+        ctx4.fill();
+        ctx4.beginPath();
+        ctx4.arc(305, 205, 6, 0, Math.PI * 2);
+        ctx4.fill();
+        
+        // Drip from Y
+        ctx4.beginPath();
+        ctx4.moveTo(420, 155);
+        ctx4.lineTo(415, 190);
+        ctx4.lineTo(425, 190);
+        ctx4.closePath();
+        ctx4.fill();
+        ctx4.beginPath();
+        ctx4.arc(420, 195, 5, 0, Math.PI * 2);
+        ctx4.fill();
+        
+        // Glow effect on text
+        ctx4.shadowBlur = 30;
+        ctx4.shadowColor = '#ff0000';
+        ctx4.font = 'bold 80px Arial Black';
+        ctx4.fillStyle = '#fff';
+        ctx4.fillText('DARKCITY', canvas4.width / 2, 120);
+        
+        ctx4.shadowBlur = 0;
+        
+        // Subtitle
+        ctx4.font = '16px Courier New';
+        ctx4.fillStyle = '#666';
+        ctx4.fillText('AGENT BLOODSPORT ARENA', canvas4.width / 2, 240);
+    </script>
+</body>
+</html>

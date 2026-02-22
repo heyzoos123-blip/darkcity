@@ -1,0 +1,33 @@
+{
+  "name": "@darkcity/combat-engine",
+  "version": "1.0.0",
+  "description": "Deterministic AI agent battle system with SOL-as-health mechanics",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "example": "ts-node examples/basic-match.ts",
+    "benchmark": "ts-node examples/benchmark.ts"
+  },
+  "keywords": [
+    "combat",
+    "game-engine",
+    "ai",
+    "agent",
+    "battle-royale",
+    "solana",
+    "deterministic"
+  ],
+  "author": "darkflobi",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

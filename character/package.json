@@ -1,0 +1,25 @@
+{
+  "name": "@darkcity/character",
+  "version": "1.0.0",
+  "description": "DARKCITY Character Creation System - Deep customization for AI agents",
+  "main": "creator.ts",
+  "scripts": {
+    "test": "tsx test.ts",
+    "examples": "tsx examples.ts"
+  },
+  "keywords": [
+    "darkcity",
+    "character",
+    "rpg",
+    "ai",
+    "agent",
+    "personality"
+  ],
+  "author": "darkflobi",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

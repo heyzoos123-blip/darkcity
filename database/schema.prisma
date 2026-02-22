@@ -1,0 +1,557 @@
+// DARKCITY Database Schema
+// PostgreSQL 15+ with Prisma ORM
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector, pg_trgm]
+}
+
+// ============================================================================
+// USERS & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  agents Agent[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// AGENTS
+// ============================================================================
+
+model Agent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  name      String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  lastActiveAt DateTime? @map("last_active_at")
+
+  // Current state
+  currentLocationId String? @map("current_location_id") @db.Uuid
+  status            AgentStatus @default(IDLE)
+
+  // Economy
+  darkcoinBalance   BigInt @default(0) @map("darkcoin_balance")
+  darkflobiBalance  BigInt @default(0) @map("darkflobi_balance")
+
+  // Metadata (JSONB for flexible attributes)
+  metadata Json @default("{}")
+
+  // Relations
+  owner               User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  currentLocation     Location?                 @relation("AgentLocation", fields: [currentLocationId], references: [id])
+  identity            AgentIdentity?
+  experiences         Experience[]
+  dailySummaries      DailySummary[]
+  relationshipsFrom   Relationship[]            @relation("RelationshipFrom")
+  relationshipsTo     Relationship[]            @relation("RelationshipTo")
+  interactionsInit    Interaction[]             @relation("InteractionInitiator")
+  participants        InteractionParticipant[]
+  messages            Message[]
+  transactionsAsBuyer Transaction[]             @relation("TransactionBuyer")
+  transactionsAsSeller Transaction[]            @relation("TransactionSeller")
+  reputationEvents    ReputationEvent[]
+  ownedProperties     Location[]                @relation("PropertyOwner")
+
+  @@index([ownerId])
+  @@index([currentLocationId], map: "idx_agents_location")
+  @@index([status])
+  @@map("agents")
+}
+
+enum AgentStatus {
+  IDLE
+  MOVING
+  INTERACTING
+  OFFLINE
+}
+
+// ============================================================================
+// AGENT IDENTITY & MEMORY
+// ============================================================================
+
+model AgentIdentity {
+  agentId String @id @map("agent_id") @db.Uuid
+
+  // Big Five personality traits (0-100)
+  openness          Int @default(50) @db.SmallInt
+  conscientiousness Int @default(50) @db.SmallInt
+  extraversion      Int @default(50) @db.SmallInt
+  agreeableness     Int @default(50) @db.SmallInt
+  neuroticism       Int @default(50) @db.SmallInt
+
+  // Derived attributes (JSONB)
+  values              Json @default("{}")
+  communicationStyle  Json @default("{}") @map("communication_style")
+  personalityHistory  Json @default("[]") @map("personality_history")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_identities")
+}
+
+model Experience {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId String @map("agent_id") @db.Uuid
+
+  // When/where
+  timestamp  DateTime @default(now())
+  locationId String?  @map("location_id") @db.Uuid
+
+  // What happened
+  type         ExperienceType
+  description  String         @db.Text
+  participants String[]       @default([]) @db.Uuid[]
+
+  // Perception (0-1 range)
+  emotionalValence Decimal @default(0) @map("emotional_valence") @db.Decimal(3, 2)
+  emotionalArousal Decimal @default(0) @map("emotional_arousal") @db.Decimal(3, 2)
+  significance     Decimal @default(0.5) @map("significance") @db.Decimal(3, 2)
+
+  // Outcomes (JSONB)
+  consequences Json @default("{}")
+
+  // Retrieval
+  tags String[] @default([])
+
+  // Consolidation tracking
+  consolidatedInto String?   @map("consolidated_into") @db.Uuid
+  consolidatedAt   DateTime? @map("consolidated_at")
+
+  // Relations
+  agent            Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  location         Location?     @relation(fields: [locationId], references: [id])
+  dailySummary     DailySummary? @relation(fields: [consolidatedInto], references: [id])
+
+  @@index([agentId, timestamp(sort: Desc)], map: "idx_experiences_agent_time")
+  @@index([agentId, significance(sort: Desc)], map: "idx_experiences_significance")
+  @@index([type])
+  @@map("experiences")
+}
+
+enum ExperienceType {
+  CONVERSATION
+  TRANSACTION
+  EVENT_WITNESSED
+  EVENT_PARTICIPATED
+  LOCATION_VISITED
+  DISCOVERY
+  CONFLICT
+  ACHIEVEMENT
+}
+
+model DailySummary {
+  id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId String   @map("agent_id") @db.Uuid
+  date    DateTime @db.Date
+
+  // Summary
+  narrative           String @db.Text
+  highlights          Json   @default("{}")
+  emotionalJourney    Json   @default("{}") @map("emotional_journey")
+  lessonsLearned      String[] @default([]) @map("lessons_learned")
+  personalityInfluences Json @default("[]") @map("personality_influences")
+
+  // For vector search (pgvector)
+  embedding String? @db.Text // Will store vector as text representation
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  experiences Experience[]
+
+  @@unique([agentId, date])
+  @@index([agentId, date(sort: Desc)])
+  @@map("daily_summaries")
+}
+
+model Relationship {
+  agentId      String @map("agent_id") @db.Uuid
+  otherAgentId String @map("other_agent_id") @db.Uuid
+
+  type             RelationshipType @default(ACQUAINTANCE)
+  sentiment        Int              @default(0) @db.SmallInt // -100 to 100
+  trust            Int              @default(50) @db.SmallInt // 0 to 100
+  interactionCount Int              @default(0) @map("interaction_count")
+  lastInteractionAt DateTime?       @map("last_interaction_at")
+
+  memorableMoments String[] @default([]) @map("memorable_moments") @db.Uuid[]
+
+  // Relations
+  agent      Agent @relation("RelationshipFrom", fields: [agentId], references: [id], onDelete: Cascade)
+  otherAgent Agent @relation("RelationshipTo", fields: [otherAgentId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, otherAgentId])
+  @@map("relationships")
+}
+
+enum RelationshipType {
+  STRANGER
+  ACQUAINTANCE
+  FRIEND
+  CLOSE_FRIEND
+  RIVAL
+  ENEMY
+  BUSINESS_PARTNER
+  ROMANTIC
+}
+
+// ============================================================================
+// GEOGRAPHY
+// ============================================================================
+
+model District {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String @unique @db.VarChar(50)
+  description String @db.Text
+
+  // Characteristics (0-100)
+  noiseLevel  Int @default(50) @map("noise_level") @db.SmallInt
+  crowding    Int @default(50) @db.SmallInt
+  wealthIndex Int @default(50) @map("wealth_index") @db.SmallInt
+  dangerLevel Int @default(20) @map("danger_level") @db.SmallInt
+
+  // Visuals
+  colorPalette String[] @default([]) @map("color_palette")
+  aesthetic    Json     @default("{}")
+
+  // Relations
+  zones Zone[]
+
+  @@map("districts")
+}
+
+model Zone {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  districtId String   @map("district_id") @db.Uuid
+  name       String   @db.VarChar(50)
+  type       ZoneType
+
+  maxOccupancy Int @default(100) @map("max_occupancy")
+
+  // Events
+  eventProbabilities Json     @default("{}") @map("event_probabilities")
+  exclusiveEvents    String[] @default([]) @map("exclusive_events")
+
+  // Relations
+  district  District   @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  locations Location[]
+
+  @@unique([districtId, name])
+  @@index([districtId])
+  @@map("zones")
+}
+
+enum ZoneType {
+  COMMERCIAL
+  RESIDENTIAL
+  ENTERTAINMENT
+  BUSINESS
+  INDUSTRIAL
+  TRANSIT
+  PUBLIC
+  UNDERGROUND
+}
+
+model Location {
+  id      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  zoneId  String       @map("zone_id") @db.Uuid
+  name    String       @db.VarChar(100)
+  type    LocationType
+
+  // Ownership
+  ownerId  String?  @map("owner_id") @db.Uuid
+  isPublic Boolean  @default(true) @map("is_public")
+  capacity Int      @default(20)
+
+  // Descriptions
+  description         String  @db.Text
+  interiorDescription String? @map("interior_description") @db.Text
+  thumbnailUrl        String? @map("thumbnail_url")
+
+  // Requirements
+  entryRequirements Json @default("{}") @map("entry_requirements")
+
+  // State
+  isOpen Boolean @default(true) @map("is_open")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  zone        Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  owner       Agent?       @relation("PropertyOwner", fields: [ownerId], references: [id])
+  agentsHere  Agent[]      @relation("AgentLocation")
+  experiences Experience[]
+  interactions Interaction[]
+  events       Event[]
+
+  @@index([zoneId], map: "idx_locations_zone")
+  @@index([ownerId])
+  @@map("locations")
+}
+
+enum LocationType {
+  CAFE
+  BAR
+  CLUB
+  SHOP
+  APARTMENT
+  OFFICE
+  PARK
+  STREET
+  ALLEY
+  SUBWAY
+  WAREHOUSE
+  FACTORY
+  THEATER
+  GALLERY
+  GYM
+  HOTEL
+}
+
+// ============================================================================
+// INTERACTIONS
+// ============================================================================
+
+model Interaction {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        InteractionType
+  status      InteractionStatus @default(PENDING)
+
+  initiatorId String  @map("initiator_id") @db.Uuid
+  locationId  String? @map("location_id") @db.Uuid
+
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  metadata Json @default("{}")
+
+  // Relations
+  initiator    Agent                    @relation("InteractionInitiator", fields: [initiatorId], references: [id])
+  location     Location?                @relation(fields: [locationId], references: [id])
+  participants InteractionParticipant[]
+  messages     Message[]
+
+  @@index([initiatorId])
+  @@index([status])
+  @@map("interactions")
+}
+
+enum InteractionType {
+  CONVERSATION
+  TRANSACTION
+  SERVICE
+  CHALLENGE
+  COLLABORATION
+  GREETING
+  GOSSIP
+}
+
+enum InteractionStatus {
+  PENDING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+  REJECTED
+}
+
+model InteractionParticipant {
+  interactionId String   @map("interaction_id") @db.Uuid
+  agentId       String   @map("agent_id") @db.Uuid
+  role          String   @default("PARTICIPANT") @db.VarChar(20)
+  joinedAt      DateTime @default(now()) @map("joined_at")
+  leftAt        DateTime? @map("left_at")
+
+  // Relations
+  interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  agent       Agent       @relation(fields: [agentId], references: [id])
+
+  @@id([interactionId, agentId])
+  @@map("interaction_participants")
+}
+
+model Message {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  interactionId String   @map("interaction_id") @db.Uuid
+  fromAgentId   String   @map("from_agent_id") @db.Uuid
+  timestamp     DateTime @default(now())
+
+  content String @db.Text
+  tone    String? @db.VarChar(30)
+  action  String? @db.Text
+
+  // For transactions
+  offer Json?
+
+  // AI metadata
+  generationMetadata Json? @map("generation_metadata")
+
+  // Relations
+  interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  fromAgent   Agent       @relation(fields: [fromAgentId], references: [id])
+
+  @@index([interactionId, timestamp(sort: Desc)], map: "idx_messages_interaction")
+  @@map("messages")
+}
+
+// ============================================================================
+// ECONOMY
+// ============================================================================
+
+model Transaction {
+  id       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type     TransactionType
+  status   TransactionStatus @default(PENDING)
+
+  buyerId  String @map("buyer_id") @db.Uuid
+  sellerId String @map("seller_id") @db.Uuid
+
+  items    Json   @default("[]")
+  amount   BigInt
+  currency Currency
+
+  negotiationHistory Json @default("[]") @map("negotiation_history")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Blockchain reference
+  transactionHash String? @map("transaction_hash") @db.VarChar(100)
+
+  // Relations
+  buyer  Agent @relation("TransactionBuyer", fields: [buyerId], references: [id])
+  seller Agent @relation("TransactionSeller", fields: [sellerId], references: [id])
+
+  @@index([status], map: "idx_transactions_status")
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  PURCHASE
+  SALE
+  SERVICE
+  TRADE
+  RENT
+  WAGE
+}
+
+enum TransactionStatus {
+  PENDING
+  NEGOTIATING
+  AGREED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum Currency {
+  DARKCOIN
+  DARKFLOBI
+}
+
+// ============================================================================
+// EVENTS
+// ============================================================================
+
+model Event {
+  id    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type  EventType
+  scope EventScope
+
+  affectedZones String[] @default([]) @map("affected_zones") @db.Uuid[]
+  participants  String[] @default([]) @db.Uuid[]
+
+  startedAt       DateTime @default(now()) @map("started_at")
+  endedAt         DateTime? @map("ended_at")
+  durationSeconds Int?     @map("duration_seconds")
+
+  effects  Json @default("{}")
+  outcomes Json @default("{}")
+  metadata Json @default("{}")
+
+  // Relations
+  locations Location[]
+
+  @@index([type, startedAt(sort: Desc)], map: "idx_events_type_time")
+  @@index([affectedZones], type: Gin)
+  @@map("events")
+}
+
+enum EventType {
+  WEATHER
+  TIME_OF_DAY
+  CITY_ANNOUNCEMENT
+  INFRASTRUCTURE
+  RANDOM_ENCOUNTER
+  CRIME
+  OPPORTUNITY
+  DISCOVERY
+  FESTIVAL
+  POWER_OUTAGE
+}
+
+enum EventScope {
+  GLOBAL
+  DISTRICT
+  ZONE
+  LOCATION
+}
+
+model ReputationEvent {
+  id      String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentId String               @map("agent_id") @db.Uuid
+  type    ReputationEventType
+  delta   Int                  @db.SmallInt
+  reason  String               @db.Text
+
+  sourceAgentId String?         @map("source_agent_id") @db.Uuid
+  scope         ReputationScope @default(GLOBAL)
+  scopeId       String?         @map("scope_id") @db.Uuid
+
+  timestamp DateTime @default(now())
+
+  // Relations
+  agent       Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  sourceAgent Agent? @relation(fields: [sourceAgentId], references: [id])
+
+  @@index([agentId, timestamp(sort: Desc)], map: "idx_reputation_agent_time")
+  @@map("reputation_events")
+}
+
+enum ReputationEventType {
+  TRANSACTION_COMPLETED
+  TRANSACTION_FAILED
+  HELPED_AGENT
+  HARMED_AGENT
+  CRIME_COMMITTED
+  CRIME_WITNESSED
+  ACHIEVEMENT
+  COMMUNITY_CONTRIBUTION
+}
+
+enum ReputationScope {
+  GLOBAL
+  DISTRICT
+  FACTION
+}

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THE NEXUS - DARKCITY Central Hub</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #000;
+      color: #0ff;
+      overflow: hidden;
+    }
+
+    #darkcity-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border: 2px solid #00ffff;
+      border-radius: 4px;
+      font-size: 12px;
+      max-width: 300px;
+      z-index: 100;
+    }
+
+    #hud h2 {
+      color: #ff00ff;
+      margin-bottom: 10px;
+      font-size: 16px;
+      text-shadow: 0 0 10px #ff00ff;
+    }
+
+    #hud .stat {
+      margin: 5px 0;
+      color: #00ffaa;
+    }
+
+    #hud .control {
+      margin: 3px 0;
+      color: #ffaa00;
+      font-size: 11px;
+    }
+
+    #zone-info {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      padding: 10px 20px;
+      border: 1px solid #00ffff;
+      border-radius: 3px;
+      font-size: 14px;
+      color: #00ffff;
+      text-align: center;
+      text-shadow: 0 0 5px #00ffff;
+      z-index: 100;
+      display: none;
+    }
+
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      color: #ff00ff;
+      text-shadow: 0 0 20px #ff00ff;
+      z-index: 200;
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #minimap {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 150px;
+      height: 150px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid #00ffff;
+      border-radius: 4px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="darkcity-container"></div>
+  
+  <div id="loading" class="pulse">
+    INITIALIZING THE NEXUS...
+  </div>
+
+  <div id="hud">
+    <h2>⬢ THE NEXUS</h2>
+    <div class="stat">Mode: <span id="mode">STANDARD</span></div>
+    <div class="stat">Zone: <span id="current-zone">SPAWN PLAZA</span></div>
+    <div class="stat">Coords: <span id="coords">0, 0, 0</span></div>
+    <hr style="border-color: #00ffff; margin: 10px 0;">
+    <div class="control">WASD - Move</div>
+    <div class="control">Q/E - Rotate</div>
+    <div class="control">V - Spectator Mode</div>
+    <div class="control">1-9 - Fast Travel</div>
+    <div class="control">Mouse Drag - Look</div>
+    <hr style="border-color: #00ffff; margin: 10px 0;">
+    <div class="stat" style="font-size: 10px; color: #888;">
+      N64-style Gothic City<br>
+      Built with Three.js
+    </div>
+  </div>
+
+  <div id="zone-info"></div>
+  <div id="minimap"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import { NexusHub } from './nexus-hub.js';
+
+    // Initialize
+    const container = document.getElementById('darkcity-container');
+    const nexus = new NexusHub();
+    
+    // Hide loading screen after init
+    nexus.init(container);
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+    }, 1500);
+
+    // HUD updates
+    setInterval(() => {
+      const pos = nexus.player.position;
+      document.getElementById('coords').textContent = 
+        `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+      
+      document.getElementById('mode').textContent = 
+        nexus.spectatorMode ? 'SPECTATOR' : 'STANDARD';
+      
+      // Update current zone
+      let currentZone = 'UNKNOWN';
+      nexus.zones.forEach((zone, id) => {
+        const dist = pos.distanceTo(zone.center);
+        if (dist < zone.radius) {
+          currentZone = zone.name.toUpperCase();
+        }
+      });
+      document.getElementById('current-zone').textContent = currentZone;
+    }, 100);
+
+    // Zone notifications
+    let lastZone = null;
+    setInterval(() => {
+      const pos = nexus.player.position;
+      let currentZone = null;
+      
+      nexus.zones.forEach((zone, id) => {
+        const dist = pos.distanceTo(zone.center);
+        if (dist < zone.radius) {
+          currentZone = zone.name;
+        }
+      });
+      
+      if (currentZone && currentZone !== lastZone) {
+        const zoneInfo = document.getElementById('zone-info');
+        zoneInfo.textContent = `⬢ ${currentZone.toUpperCase()}`;
+        zoneInfo.style.display = 'block';
+        
+        setTimeout(() => {
+          zoneInfo.style.display = 'none';
+        }, 3000);
+      }
+      
+      lastZone = currentZone;
+    }, 500);
+
+    // Mini-map rendering
+    const minimapCanvas = document.createElement('canvas');
+    minimapCanvas.width = 150;
+    minimapCanvas.height = 150;
+    document.getElementById('minimap').appendChild(minimapCanvas);
+    const minimapCtx = minimapCanvas.getContext('2d');
+
+    function updateMinimap() {
+      minimapCtx.fillStyle = '#000';
+      minimapCtx.fillRect(0, 0, 150, 150);
+      
+      // Grid
+      minimapCtx.strokeStyle = '#00ffff33';
+      minimapCtx.lineWidth = 1;
+      for (let i = 0; i <= 150; i += 30) {
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(i, 0);
+        minimapCtx.lineTo(i, 150);
+        minimapCtx.stroke();
+        minimapCtx.beginPath();
+        minimapCtx.moveTo(0, i);
+        minimapCtx.lineTo(150, i);
+        minimapCtx.stroke();
+      }
+      
+      // Zones
+      nexus.zones.forEach(zone => {
+        const x = 75 + zone.center.x * 1.2;
+        const y = 75 + zone.center.z * 1.2;
+        const r = zone.radius * 1.2;
+        
+        minimapCtx.beginPath();
+        minimapCtx.arc(x, y, r, 0, Math.PI * 2);
+        minimapCtx.strokeStyle = zone.isPortal ? '#ff0066' : '#00ffff';
+        minimapCtx.lineWidth = 2;
+        minimapCtx.stroke();
+      });
+      
+      // Player
+      const px = 75 + nexus.player.position.x * 1.2;
+      const py = 75 + nexus.player.position.z * 1.2;
+      minimapCtx.beginPath();
+      minimapCtx.arc(px, py, 3, 0, Math.PI * 2);
+      minimapCtx.fillStyle = '#ff00ff';
+      minimapCtx.fill();
+      
+      // Player direction indicator
+      const dirX = px + Math.sin(nexus.player.rotation) * 5;
+      const dirY = py + Math.cos(nexus.player.rotation) * 5;
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(px, py);
+      minimapCtx.lineTo(dirX, dirY);
+      minimapCtx.strokeStyle = '#ff00ff';
+      minimapCtx.lineWidth = 2;
+      minimapCtx.stroke();
+      
+      requestAnimationFrame(updateMinimap);
+    }
+    updateMinimap();
+
+    // Expose to console for debugging
+    window.nexus = nexus;
+    console.log('%c⬢ THE NEXUS ONLINE', 'color: #00ffff; font-size: 20px; font-weight: bold;');
+    console.log('Access via window.nexus');
+    console.log('Available zones:', nexus.getZones());
+  </script>
+</body>
+</html>

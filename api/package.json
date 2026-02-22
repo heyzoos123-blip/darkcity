@@ -1,0 +1,46 @@
+{
+  "name": "darkcity-agent-api",
+  "version": "1.0.0",
+  "description": "REST + WebSocket API for autonomous agents to control DARKCITY battle characters",
+  "main": "dist/agent-api.js",
+  "scripts": {
+    "dev": "tsx watch agent-api.ts",
+    "start": "node dist/agent-api.js",
+    "build": "tsc",
+    "test": "tsx test-api.ts",
+    "example": "tsx agent-client-example.ts",
+    "docs": "swagger-jsdoc -d swaggerDef.js agent-api.ts -o openapi.json",
+    "docs:serve": "swagger-ui-serve openapi.json"
+  },
+  "keywords": [
+    "darkcity",
+    "battle",
+    "agent",
+    "api",
+    "autonomous",
+    "ai",
+    "game"
+  ],
+  "author": "DARKCITY",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "ws": "^8.16.0",
+    "tweetnacl": "^1.0.3",
+    "bs58": "^5.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.5",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

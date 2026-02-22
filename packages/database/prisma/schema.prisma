@@ -1,0 +1,189 @@
+// DARKCITY Unified Database Schema
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Agents
+model Agent {
+  id                String   @id @default(uuid())
+  walletAddress     String   @unique
+  name              String
+  bio               String?
+  avatarUrl         String?
+  status            String   @default("ACTIVE") // ACTIVE, IDLE, BUSY, OFFLINE, SUSPENDED
+  personality       Json     // Big Five traits
+  solBalance        Float    @default(0)
+  currentLocationId String?
+  currentZoneId     String?
+  reputation        Int      @default(0)
+  level             Int      @default(1)
+  createdAt         DateTime @default(now())
+  lastActiveAt      DateTime @default(now())
+  
+  memories       Memory[]
+  interactions   Interaction[] @relation("AgentInteractions")
+  messages       Message[]
+  experiences    Experience[]
+  
+  @@index([walletAddress])
+  @@index([status])
+  @@index([currentZoneId])
+}
+
+// Districts
+model District {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  color       String
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  
+  zones  Zone[]
+  events Event[]
+  
+  @@index([name])
+}
+
+// Zones
+model Zone {
+  id          String   @id @default(uuid())
+  districtId  String
+  name        String
+  description String
+  type        String   // RESIDENTIAL, COMMERCIAL, INDUSTRIAL, etc.
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  
+  district     District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  locations    Location[]
+  events       Event[]
+  interactions Interaction[]
+  
+  @@index([districtId])
+  @@index([type])
+}
+
+// Locations (specific places within zones)
+model Location {
+  id          String   @id @default(uuid())
+  zoneId      String
+  name        String
+  type        String   // BUILDING, STREET, LANDMARK, etc.
+  coordinates Json?    // { lat, lng }
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  
+  zone   Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  events Event[]
+  
+  @@index([zoneId])
+  @@index([type])
+}
+
+// Events
+model Event {
+  id             String   @id @default(uuid())
+  type           String   // ENVIRONMENTAL, ENCOUNTER, SOCIAL, ECONOMIC, QUEST, COMBAT
+  title          String
+  description    String
+  priority       String   @default("NORMAL") // LOW, NORMAL, HIGH, CRITICAL
+  zoneId         String?
+  districtId     String?
+  locationId     String?
+  affectedAgents Json     @default("[]") // Array of agent IDs
+  data           Json     @default("{}")
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime?
+  
+  zone       Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  district   District? @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  
+  @@index([type])
+  @@index([zoneId])
+  @@index([districtId])
+  @@index([createdAt])
+}
+
+// Interactions
+model Interaction {
+  id             String   @id @default(uuid())
+  type           String   // CONVERSATION, TRANSACTION, COLLABORATION, CONFLICT
+  state          String   @default("PENDING") // PENDING, ACTIVE, COMPLETED, CANCELLED, FAILED
+  initiatorId    String
+  participantIds Json     @default("[]") // Array of agent IDs
+  zoneId         String?
+  metadata       Json     @default("{}")
+  startedAt      DateTime @default(now())
+  endedAt        DateTime?
+  
+  initiator Agent     @relation("AgentInteractions", fields: [initiatorId], references: [id], onDelete: Cascade)
+  zone      Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  messages  Message[]
+  
+  @@index([initiatorId])
+  @@index([type])
+  @@index([state])
+  @@index([zoneId])
+}
+
+// Messages (within conversations)
+model Message {
+  id            String   @id @default(uuid())
+  interactionId String
+  senderId      String
+  content       String
+  sentiment     Float?   // -1 to 1
+  createdAt     DateTime @default(now())
+  
+  interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+  sender      Agent       @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  @@index([interactionId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+// Memory (Episodic + Semantic)
+model Memory {
+  id             String   @id @default(uuid())
+  agentId        String
+  type           String   // EXPERIENCE, CONVERSATION, OBSERVATION, ACHIEVEMENT, RELATIONSHIP
+  content        String
+  importance     String   @default("MODERATE") // TRIVIAL, MINOR, MODERATE, SIGNIFICANT, CRITICAL
+  embedding      Float[] // Vector embedding (for semantic search) - use empty array for no embedding
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  lastAccessedAt DateTime @default(now())
+  accessCount    Int      @default(0)
+  
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@index([agentId])
+  @@index([type])
+  @@index([importance])
+  @@index([createdAt])
+}
+
+// Experiences (detailed event history)
+model Experience {
+  id          String   @id @default(uuid())
+  agentId     String
+  eventId     String?
+  description String
+  emotionalImpact Float? // -1 to 1
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  @@index([agentId])
+  @@index([createdAt])
+}

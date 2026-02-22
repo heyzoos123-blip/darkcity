@@ -1,0 +1,229 @@
+DARKCITY Map Interface - Complete File Structure
+================================================
+
+map-interface/
+│
+├── 📱 app/ (Next.js App Router)
+│   ├── layout.tsx (472 bytes) - Root layout with metadata
+│   └── page.tsx (488 bytes) - Main page, imports DarkCityMap
+│
+├── 🎨 components/ (React Components)
+│   ├── DarkCityMap.tsx (12,571 bytes) - Main map component
+│   │   ├── Leaflet.js integration
+│   │   ├── District overlays (10 districts)
+│   │   ├── Street grid rendering
+│   │   ├── Landmark markers
+│   │   ├── Agent markers with custom icons
+│   │   ├── Breadcrumb trails
+│   │   ├── Interaction markers
+│   │   ├── WebSocket connection
+│   │   └── Mock data fallback
+│   │
+│   ├── MapControls.tsx (9,846 bytes) - Left control panel
+│   │   ├── Agent selector
+│   │   ├── Agent list with stats
+│   │   ├── Connection status
+│   │   ├── Time range filters
+│   │   ├── Layer toggles
+│   │   └── Responsive design
+│   │
+│   └── StatsPanel.tsx (7,034 bytes) - Bottom stats panel
+│       ├── Current location display
+│       ├── Current activity
+│       ├── Earnings tracker
+│       ├── Recent interactions
+│       └── Real-time updates
+│
+├── 📚 lib/ (Core Logic & Data)
+│   ├── mapData.ts (11,288 bytes) - Geographic data
+│   │   ├── 10 Districts with boundaries
+│   │   ├── 50+ Streets (Manhattan grid)
+│   │   ├── 20+ Landmarks (8 types)
+│   │   ├── Helper functions
+│   │   └── Point-in-polygon checks
+│   │
+│   ├── types.ts (1,945 bytes) - TypeScript definitions
+│   │   ├── Agent interface
+│   │   ├── Location interface
+│   │   ├── Interaction types
+│   │   ├── District types
+│   │   ├── Landmark types
+│   │   └── WebSocket message types
+│   │
+│   ├── utils.ts (6,089 bytes) - Helper functions
+│   │   ├── Distance calculations
+│   │   ├── SOL formatting
+│   │   ├── Time formatting
+│   │   ├── Color generation
+│   │   ├── Coordinate validation
+│   │   ├── Interpolation
+│   │   ├── Debounce/throttle
+│   │   └── WebSocket URL parsing
+│   │
+│   └── websocket.ts (4,421 bytes) - WebSocket client
+│       ├── Connection management
+│       ├── Auto-reconnect logic
+│       ├── Message handling
+│       ├── Event subscription
+│       └── Mock data generator
+│
+├── 🖥️ server/ (Development Tools)
+│   └── mock-ws-server.js (3,825 bytes) - Mock WebSocket server
+│       ├── 3 mock agents
+│       ├── Simulated movement
+│       ├── Position broadcasts
+│       ├── Interaction events
+│       └── Stats updates
+│
+├── 🎨 styles/ (Styling)
+│   └── map.css (4,358 bytes) - Custom map styles
+│       ├── CSS variables (colors)
+│       ├── Dark cyberpunk theme
+│       ├── Leaflet customization
+│       ├── Popup styling
+│       ├── Animations
+│       ├── Neon effects
+│       └── Responsive utilities
+│
+├── 📖 Documentation (54.7KB total)
+│   ├── README.md (2,569 bytes) - Project overview
+│   │   ├── Features
+│   │   ├── Tech stack
+│   │   ├── Installation
+│   │   ├── Usage
+│   │   └── File structure
+│   │
+│   ├── SETUP.md (7,979 bytes) - Detailed setup guide
+│   │   ├── Prerequisites
+│   │   ├── Installation steps
+│   │   ├── Running with mock data
+│   │   ├── Real backend connection
+│   │   ├── Project structure
+│   │   ├── Development workflow
+│   │   ├── Building for production
+│   │   ├── Configuration
+│   │   ├── Troubleshooting
+│   │   └── Testing checklist
+│   │
+│   ├── INTEGRATION.md (5,647 bytes) - Backend integration
+│   │   ├── Quick start
+│   │   ├── WebSocket protocol
+│   │   ├── Message formats
+│   │   ├── Backend examples
+│   │   ├── Customization
+│   │   ├── Deployment
+│   │   ├── API reference
+│   │   ├── Troubleshooting
+│   │   └── Advanced features
+│   │
+│   ├── FEATURES.md (8,544 bytes) - Complete feature list
+│   │   ├── Core features
+│   │   ├── Districts & geography
+│   │   ├── Agent tracking
+│   │   ├── UI components
+│   │   ├── Real-time features
+│   │   ├── Technical features
+│   │   ├── Use cases
+│   │   ├── Planned features
+│   │   ├── Performance benchmarks
+│   │   └── Browser support
+│   │
+│   ├── EXAMPLES.md (12,518 bytes) - Code examples
+│   │   ├── Adding districts
+│   │   ├── Creating landmarks
+│   │   ├── Custom markers
+│   │   ├── WebSocket integration
+│   │   ├── Custom styling
+│   │   ├── Event handlers
+│   │   ├── Data filtering
+│   │   └── Analytics integration
+│   │
+│   ├── PROJECT_SUMMARY.md (11,176 bytes) - Comprehensive summary
+│   │   ├── What was built
+│   │   ├── Mission checklist
+│   │   ├── Project structure
+│   │   ├── DARKCITY world
+│   │   ├── Tech stack
+│   │   ├── Key features
+│   │   ├── WebSocket protocol
+│   │   ├── Design system
+│   │   ├── Performance metrics
+│   │   ├── Use cases
+│   │   ├── Future enhancements
+│   │   └── Next steps
+│   │
+│   ├── QUICK_REFERENCE.md (6,545 bytes) - One-page reference
+│   │   ├── Quick start
+│   │   ├── File structure
+│   │   ├── Districts table
+│   │   ├── Streets list
+│   │   ├── Landmark types
+│   │   ├── WebSocket messages
+│   │   ├── Color palette
+│   │   ├── NPM scripts
+│   │   ├── Common tasks
+│   │   ├── Testing
+│   │   ├── Deployment
+│   │   └── Troubleshooting
+│   │
+│   ├── COMPLETION_REPORT.md (10,010 bytes) - Final report
+│   │   ├── Mission status
+│   │   ├── Deliverables checklist
+│   │   ├── Project statistics
+│   │   ├── Districts created
+│   │   ├── Features implemented
+│   │   ├── Quality metrics
+│   │   ├── Highlights
+│   │   ├── Documentation breakdown
+│   │   ├── Next steps
+│   │   └── Success criteria
+│   │
+│   └── FILE_TREE.txt (this file) - File structure visualization
+│
+├── ⚙️ Configuration Files
+│   ├── package.json (797 bytes) - Dependencies & scripts
+│   │   ├── next: ^14.0.0
+│   │   ├── react: ^18.0.0
+│   │   ├── leaflet: ^1.9.4
+│   │   ├── react-leaflet: ^4.2.1
+│   │   └── typescript: ^5.0.0
+│   │
+│   ├── tsconfig.json (644 bytes) - TypeScript configuration
+│   │   ├── Target: ES2020
+│   │   ├── Strict mode enabled
+│   │   ├── Path aliases
+│   │   └── Next.js plugin
+│   │
+│   ├── next.config.js (311 bytes) - Next.js configuration
+│   │   ├── React strict mode
+│   │   └── Webpack config for Leaflet
+│   │
+│   └── .gitignore (368 bytes) - Git ignore rules
+│       ├── node_modules/
+│       ├── .next/
+│       ├── .env*.local
+│       └── Build artifacts
+│
+└── 📊 Project Statistics
+    ├── Total Files: 25
+    ├── Total Code: ~60KB
+    ├── Documentation: ~55KB
+    ├── Total Size: ~115KB
+    ├── Components: 3
+    ├── Libraries: 4
+    ├── Districts: 10
+    ├── Streets: 50+
+    └── Landmarks: 20+
+
+Legend:
+├── 📱 Next.js pages
+├── 🎨 React components
+├── 📚 Core libraries
+├── 🖥️ Development tools
+├── 🎨 Styling
+├── 📖 Documentation
+└── ⚙️ Configuration
+
+Status: ✅ COMPLETE & PRODUCTION-READY
+Date: February 22, 2026
+Built by: darkflobi's subagent

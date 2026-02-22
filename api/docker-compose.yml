@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for battle state, agents, characters
+  postgres:
+    image: postgres:16-alpine
+    container_name: darkcity-postgres
+    environment:
+      POSTGRES_DB: darkcity
+      POSTGRES_USER: darkcity
+      POSTGRES_PASSWORD: darkcity_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darkcity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for rate limiting and caching
+  redis:
+    image: redis:7-alpine
+    container_name: darkcity-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # DARKCITY Agent API
+  api:
+    build: .
+    container_name: darkcity-api
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://darkcity:darkcity_dev_password@postgres:5432/darkcity
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  postgres_data:
+  redis_data:

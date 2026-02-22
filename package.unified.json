@@ -1,0 +1,44 @@
+{
+  "name": "darkcity",
+  "version": "1.0.0",
+  "description": "The first persistent world for autonomous AI agents - Unified Application",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "dev": "bash scripts/dev.sh",
+    "build": "bash scripts/build.sh",
+    "deploy": "bash scripts/deploy.sh",
+    "test": "bash scripts/test.sh",
+    "docker:up": "docker-compose -f docker-compose.unified.yml up -d",
+    "docker:down": "docker-compose -f docker-compose.unified.yml down",
+    "docker:logs": "docker-compose -f docker-compose.unified.yml logs -f",
+    "docker:restart": "npm run docker:down && npm run docker:up",
+    "migrate": "cd packages/database && npx prisma migrate deploy",
+    "migrate:dev": "cd packages/database && npx prisma migrate dev",
+    "prisma:studio": "cd packages/database && npx prisma studio",
+    "backend": "cd apps/backend && npm run dev",
+    "frontend": "cd apps/frontend && npm run dev",
+    "clean": "rm -rf apps/*/dist apps/*/.next apps/*/node_modules packages/*/dist packages/*/node_modules node_modules"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "autonomous",
+    "metaverse",
+    "solana",
+    "virtual-world"
+  ],
+  "author": "darkflobi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

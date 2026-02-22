@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DARKCITY - Agent Sprite Preview</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            background: #0a0a0a;
+            font-family: 'Courier New', monospace;
+            color: #00ff00;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #ff0000;
+            font-size: 48px;
+            text-shadow: 0 0 20px #ff0000;
+            margin-bottom: 60px;
+        }
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+            margin-bottom: 80px;
+        }
+        .agent-card {
+            background: #111;
+            border: 2px solid #333;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .agent-card:hover {
+            border-color: var(--agent-color);
+            box-shadow: 0 0 30px var(--agent-color);
+        }
+        .agent-name {
+            color: var(--agent-color);
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--agent-color);
+        }
+        .sprite-container {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .agent-info {
+            color: #888;
+            font-size: 14px;
+            line-height: 1.6;
+            text-align: left;
+        }
+        canvas {
+            filter: drop-shadow(0 0 20px var(--agent-color));
+        }
+        
+        .demo-section {
+            margin: 80px 0;
+            text-align: center;
+        }
+        .demo-section h2 {
+            color: #00ffff;
+            font-size: 32px;
+            text-shadow: 0 0 15px #00ffff;
+            margin-bottom: 40px;
+        }
+        .city-preview {
+            background: #000;
+            border: 2px solid #333;
+            padding: 40px;
+            position: relative;
+            height: 600px;
+            overflow: hidden;
+        }
+        .city-preview canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .legend {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .legend-item {
+            background: #111;
+            padding: 15px;
+            border-left: 3px solid var(--agent-color);
+        }
+        .legend-name {
+            color: var(--agent-color);
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .legend-desc {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌃 DARKCITY AGENT SPRITES 💀</h1>
+        
+        <div class="agent-grid" id="agentGrid"></div>
+        
+        <div class="demo-section">
+            <h2>LIVE COMBAT PREVIEW</h2>
+            <div class="city-preview">
+                <canvas id="cityCanvas"></canvas>
+            </div>
+            <div class="legend" id="legend"></div>
+        </div>
+    </div>
+    
+    <script>
+        const agents = [
+            {
+                name: 'DARKFLOBI',
+                color: '#00ff00',
+                weapon: 'Glowing Bat',
+                style: 'Mob Boss',
+                personality: 'Ruthless, Strategic'
+            },
+            {
+                name: 'THE ENFORCER',
+                color: '#ff0000',
+                weapon: 'Sledgehammer',
+                style: 'Heavy Tank',
+                personality: 'Brutal, Unstoppable'
+            },
+            {
+                name: 'THE ASSASSIN',
+                color: '#00ffff',
+                weapon: 'Dual Knives',
+                style: 'Fast & Deadly',
+                personality: 'Precise, Cold'
+            },
+            {
+                name: 'THE HACKER',
+                color: '#ff00ff',
+                weapon: 'Stun Baton',
+                style: 'Tech Warfare',
+                personality: 'Clever, Sneaky'
+            },
+            {
+                name: 'THE PYROMANIAC',
+                color: '#ffaa00',
+                weapon: 'Molotov',
+                style: 'Chaos Agent',
+                personality: 'Wild, Destructive'
+            },
+            {
+                name: 'THE MEDIC',
+                color: '#00ff88',
+                weapon: 'Bone Saw',
+                style: 'Twisted Healer',
+                personality: 'Sadistic, Mad'
+            },
+            {
+                name: 'THE SNIPER',
+                color: '#ffff00',
+                weapon: 'Sniper Rifle',
+                style: 'Long Range',
+                personality: 'Patient, Deadly'
+            },
+            {
+                name: 'THE BRAWLER',
+                color: '#ffffff',
+                weapon: 'Brass Knuckles',
+                style: 'Street Fighter',
+                personality: 'Fearless, Relentless'
+            }
+        ];
+        
+        // Draw sprite on canvas
+        function drawSprite(ctx, agent, x, y, scale = 1) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+            
+            // Glow aura
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 40);
+            gradient.addColorStop(0, agent.color + '40');
+            gradient.addColorStop(1, agent.color + '00');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(-50, -50, 100, 100);
+            
+            // Body silhouette
+            ctx.fillStyle = '#1a1a1a';
+            ctx.strokeStyle = agent.color;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = agent.color;
+            
+            // Head
+            ctx.beginPath();
+            ctx.arc(0, -20, 12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Body
+            ctx.beginPath();
+            ctx.rect(-8, -8, 16, 25);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Arms
+            ctx.beginPath();
+            ctx.moveTo(-8, -5);
+            ctx.lineTo(-15, 10);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(8, -5);
+            ctx.lineTo(15, 10);
+            ctx.stroke();
+            
+            // Legs
+            ctx.beginPath();
+            ctx.moveTo(-4, 17);
+            ctx.lineTo(-6, 30);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(4, 17);
+            ctx.lineTo(6, 30);
+            ctx.stroke();
+            
+            // Eyes (glowing)
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = agent.color;
+            ctx.beginPath();
+            ctx.arc(-4, -22, 2, 0, Math.PI * 2);
+            ctx.arc(4, -22, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Weapon indicator
+            ctx.shadowBlur = 5;
+            ctx.strokeStyle = agent.color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(15, 8);
+            ctx.lineTo(20, 15);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
+        // Create agent cards
+        agents.forEach(agent => {
+            const card = document.createElement('div');
+            card.className = 'agent-card';
+            card.style.setProperty('--agent-color', agent.color);
+            
+            card.innerHTML = `
+                <div class="agent-name">${agent.name}</div>
+                <div class="sprite-container">
+                    <canvas width="200" height="200" class="sprite-canvas"></canvas>
+                </div>
+                <div class="agent-info">
+                    <strong>Weapon:</strong> ${agent.weapon}<br>
+                    <strong>Style:</strong> ${agent.style}<br>
+                    <strong>Personality:</strong> ${agent.personality}
+                </div>
+            `;
+            
+            document.getElementById('agentGrid').appendChild(card);
+            
+            // Draw sprite
+            const canvas = card.querySelector('.sprite-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Animate idle
+            let pulse = 0;
+            function animate() {
+                ctx.clearRect(0, 0, 200, 200);
+                pulse += 0.03;
+                const scale = 1 + Math.sin(pulse) * 0.05;
+                drawSprite(ctx, agent, 100, 120, scale);
+                requestAnimationFrame(animate);
+            }
+            animate();
+            
+            // Add to legend
+            const legendItem = document.createElement('div');
+            legendItem.className = 'legend-item';
+            legendItem.style.setProperty('--agent-color', agent.color);
+            legendItem.innerHTML = `
+                <div class="legend-name">${agent.name}</div>
+                <div class="legend-desc">${agent.weapon} • ${agent.style}</div>
+            `;
+            document.getElementById('legend').appendChild(legendItem);
+        });
+        
+        // City preview with agents
+        const cityCanvas = document.getElementById('cityCanvas');
+        const cityCtx = cityCanvas.getContext('2d');
+        cityCanvas.width = 1200;
+        cityCanvas.height = 600;
+        
+        // Agent positions (simulating movement)
+        const agentPositions = agents.map((agent, i) => ({
+            agent,
+            x: 150 + (i % 4) * 300,
+            y: 150 + Math.floor(i / 4) * 300,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            health: 100
+        }));
+        
+        function drawCity() {
+            // Clear
+            cityCtx.fillStyle = '#0a0a0a';
+            cityCtx.fillRect(0, 0, cityCanvas.width, cityCanvas.height);
+            
+            // Grid
+            cityCtx.strokeStyle = '#222';
+            cityCtx.lineWidth = 1;
+            for (let x = 0; x < cityCanvas.width; x += 50) {
+                cityCtx.beginPath();
+                cityCtx.moveTo(x, 0);
+                cityCtx.lineTo(x, cityCanvas.height);
+                cityCtx.stroke();
+            }
+            for (let y = 0; y < cityCanvas.height; y += 50) {
+                cityCtx.beginPath();
+                cityCtx.moveTo(0, y);
+                cityCtx.lineTo(cityCanvas.width, y);
+                cityCtx.stroke();
+            }
+            
+            // Update and draw agents
+            agentPositions.forEach(pos => {
+                // Move
+                pos.x += pos.vx;
+                pos.y += pos.vy;
+                
+                // Bounce off walls
+                if (pos.x < 50 || pos.x > cityCanvas.width - 50) pos.vx *= -1;
+                if (pos.y < 50 || pos.y > cityCanvas.height - 50) pos.vy *= -1;
+                
+                // Draw agent
+                drawSprite(cityCtx, pos.agent, pos.x, pos.y, 1.5);
+                
+                // Health bar
+                cityCtx.fillStyle = '#333';
+                cityCtx.fillRect(pos.x - 30, pos.y - 60, 60, 6);
+                cityCtx.fillStyle = pos.agent.color;
+                cityCtx.fillRect(pos.x - 30, pos.y - 60, (pos.health / 100) * 60, 6);
+                
+                // Name label
+                cityCtx.fillStyle = pos.agent.color;
+                cityCtx.font = '10px Courier New';
+                cityCtx.textAlign = 'center';
+                cityCtx.fillText(pos.agent.name, pos.x, pos.y - 70);
+            });
+            
+            requestAnimationFrame(drawCity);
+        }
+        
+        drawCity();
+    </script>
+</body>
+</html>

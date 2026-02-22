@@ -1,0 +1,45 @@
+{
+  "name": "@darkcity/database",
+  "version": "1.0.0",
+  "description": "DARKCITY database layer with PostgreSQL, Prisma, and Redis",
+  "main": "index.ts",
+  "scripts": {
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:prod": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx seeds/001_districts_and_zones.ts",
+    "db:reset": "prisma migrate reset --force",
+    "db:push": "prisma db push",
+    "db:pull": "prisma db pull",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:test": "tsx scripts/test-db.ts",
+    "test": "vitest",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\""
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "pg": "^8.12.0",
+    "ioredis": "^5.4.1",
+    "decimal.js": "^10.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/pg": "^8.11.6",
+    "prisma": "^5.18.0",
+    "tsx": "^4.17.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "eslint": "^9.9.0",
+    "prettier": "^3.3.3"
+  },
+  "prisma": {
+    "schema": "schema.prisma",
+    "seed": "tsx seeds/001_districts_and_zones.ts"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
