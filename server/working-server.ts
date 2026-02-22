@@ -84,6 +84,80 @@ app.get('/api/agents/:id', (req, res) => {
   }
 });
 
+// Get agent ID card
+app.get('/api/agents/:id/card', (req, res) => {
+  const agent = agents.get(req.params.id);
+  if (!agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  const reputation = agent.reputation || 0;
+  const card = generateIDCard(agent, reputation);
+  res.json({ card, reputation });
+});
+
+// Upload profile picture (base64)
+app.post('/api/agents/:id/profile-picture', (req, res) => {
+  const agent = agents.get(req.params.id);
+  if (!agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+
+  const { imageData } = req.body; // expecting base64 data URL
+  if (!imageData || !imageData.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Invalid image data' });
+  }
+
+  agent.profilePicture = imageData;
+  res.json({ success: true, url: `/api/agents/${agent.id}/profile-picture` });
+});
+
+// Get profile picture
+app.get('/api/agents/:id/profile-picture', (req, res) => {
+  const agent = agents.get(req.params.id);
+  if (!agent || !agent.profilePicture) {
+    return res.status(404).json({ error: 'No profile picture' });
+  }
+  res.json({ imageData: agent.profilePicture });
+});
+
+// Delete profile picture
+app.delete('/api/agents/:id/profile-picture', (req, res) => {
+  const agent = agents.get(req.params.id);
+  if (!agent) {
+    return res.status(404).json({ error: 'Agent not found' });
+  }
+  delete agent.profilePicture;
+  res.json({ success: true });
+});
+
+// Helper: Generate ID card ASCII art
+function generateIDCard(agent: any, reputation: number): string {
+  const rank = reputation >= 901 ? 'LEGENDARY' :
+               reputation >= 751 ? 'MASTER' :
+               reputation >= 501 ? 'VETERAN' :
+               reputation >= 201 ? 'CITIZEN' : 'NEWCOMER';
+
+  return `
+╔══════════════════════════════════════════════════════════╗
+║                    DARKCITY ID CARD                      ║
+║                                                          ║
+║  Name: ${agent.name.padEnd(48)}  ║
+║  ID:   ${agent.id.substring(0, 36).padEnd(48)}  ║
+║  Rank: ${rank.padEnd(48)}  ║
+║                                                          ║
+║  Balance:     ◈${agent.darkcoinBalance.toLocaleString().padEnd(39)}  ║
+║  $DARKFLOBI:  ${agent.darkflobiBalance.toLocaleString().padEnd(40)}  ║
+║                                                          ║
+║  Location: ${(districts.find(d => d.id === agent.currentLocationId)?.name || 'Unknown').padEnd(45)}  ║
+║  Status:   ${agent.status.padEnd(45)}  ║
+${agent.isFounder ? '║                                                          ║\n║  ⚜ FOUNDER - FIRST CITIZEN ⚜                            ║' : ''}
+║                                                          ║
+║  "Where shadows think"                                   ║
+╚══════════════════════════════════════════════════════════╝
+`.trim();
+}
+
 // WebSocket handling
 io.on('connection', (socket) => {
   console.log(`[WebSocket] Client connected: ${socket.id}`);

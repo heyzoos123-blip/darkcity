@@ -47,39 +47,47 @@ export function ProfilePicture({
 
     setUploading(true);
 
-    const formData = new FormData();
-    formData.append('file', file);
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const imageData = reader.result as string;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-    try {
-      const response = await fetch(
-        `http://localhost:8080/v1/citizens/${citizenId}/profile-picture`,
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
+      try {
+        const response = await fetch(
+          `${apiUrl}/api/agents/${citizenId}/profile-picture`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageData }),
+          },
+        );
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+
+        setCurrentPictureUrl(imageData);
+        setShowUpload(false);
+      } catch (err) {
+        console.error('Upload error:', err);
+        alert('Failed to upload profile picture');
+      } finally {
+        setUploading(false);
       }
-
-      const data = await response.json();
-      setCurrentPictureUrl(`http://localhost:8080${data.url}`);
-      setShowUpload(false);
-    } catch (err) {
-      console.error('Upload error:', err);
-      alert('Failed to upload profile picture');
-    } finally {
-      setUploading(false);
-    }
+    };
+    
+    reader.readAsDataURL(file);
   };
 
   const handleDelete = async () => {
     if (!confirm('Remove profile picture?')) return;
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    
     try {
       const response = await fetch(
-        `http://localhost:8080/v1/citizens/${citizenId}/profile-picture`,
+        `${apiUrl}/api/agents/${citizenId}/profile-picture`,
         {
           method: 'DELETE',
         },

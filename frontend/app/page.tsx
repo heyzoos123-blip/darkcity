@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { CityMap } from '@/components/CityMap';
 import { AgentPanel } from '@/components/AgentPanel';
 import { EventFeed } from '@/components/EventFeed';
+import { CitizenCard } from '@/components/CitizenCard';
 import { useStore } from '@/lib/store';
 import { getSocket, connectSocket, subscribeToZones } from '@/lib/socket';
 import type { Agent, District, Event as CityEvent } from '@/types';
@@ -124,6 +125,7 @@ export default function Home() {
 
   const [districts, setDistricts] = useState<District[]>(mockDistricts);
   const [isConnected, setIsConnected] = useState(false);
+  const [showIDCard, setShowIDCard] = useState(false);
 
   useEffect(() => {
     // Set mock agent for development
@@ -219,7 +221,7 @@ export default function Home() {
               agent={selectedAgent}
               onMove={() => console.log('Move agent')}
               onInteract={() => console.log('Interact')}
-              onCustomize={() => window.location.href = `/agents/${selectedAgent.id}/customize`}
+              onCustomize={() => setShowIDCard(true)}
             />
           </motion.aside>
         )}
@@ -279,6 +281,30 @@ export default function Home() {
           </motion.aside>
         )}
       </div>
+
+      {/* ID Card Modal */}
+      {showIDCard && selectedAgent && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowIDCard(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl w-full mx-4"
+          >
+            <button
+              onClick={() => setShowIDCard(false)}
+              className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-accent-danger/20 text-accent-danger hover:bg-accent-danger/30 flex items-center justify-center text-2xl z-10"
+            >
+              ×
+            </button>
+            <CitizenCard citizenId={selectedAgent.id} />
+          </motion.div>
+        </div>
+      )}
 
       {/* Dev Note */}
       {events.length === 0 && (

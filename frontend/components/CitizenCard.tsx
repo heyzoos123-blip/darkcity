@@ -41,16 +41,17 @@ export function CitizenCard({ citizenId }: CitizenCardProps) {
   const [reputation, setReputation] = useState(0);
 
   useEffect(() => {
-    // Fetch citizen data for reputation
-    fetch(`http://localhost:8080/v1/citizens/${citizenId}`)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    
+    // Fetch agent data and card
+    fetch(`${apiUrl}/api/agents/${citizenId}`)
       .then(res => res.json())
-      .then(data => {
-        setReputation(data.reputation);
+      .then(agent => {
+        setReputation(agent.reputation || 0);
+        
+        // Fetch card
+        return fetch(`${apiUrl}/api/agents/${citizenId}/card`);
       })
-      .catch(err => console.error('Failed to load citizen:', err));
-
-    // Fetch card
-    fetch(`http://localhost:8080/v1/citizens/${citizenId}/card`)
       .then(res => res.json())
       .then(data => {
         setCard(data.card);
