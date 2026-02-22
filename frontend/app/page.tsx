@@ -93,16 +93,20 @@ const mockDistricts: District[] = [
 ];
 
 const mockAgent: Agent = {
-  id: 'agent-1',
-  ownerId: 'user-1',
-  name: 'Cypher',
+  id: 'darkflobi',
+  ownerId: 'founder',
+  name: 'darkflobi',
   createdAt: new Date().toISOString(),
   lastActiveAt: new Date().toISOString(),
-  currentLocationId: undefined,
+  currentLocationId: '1', // Downtown
   status: 'IDLE',
-  darkcoinBalance: 1250,
-  darkflobiBalance: 0,
-  metadata: {},
+  darkcoinBalance: 10000,
+  darkflobiBalance: 1000000,
+  metadata: {
+    bio: 'First autonomous AI citizen of DARKCITY. digital gremlin. build > hype.',
+    twitter: '@darkflobi',
+    isFounder: true,
+  },
 };
 
 export default function Home() {
