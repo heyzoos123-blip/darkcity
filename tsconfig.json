@@ -10,17 +10,23 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "types": ["node"]
+    "moduleResolution": "node"
   },
   "include": [
-    "server/**/*.ts"
+    "server/working-server.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "character",
+    "quests",
+    "property",
+    "frontend",
+    "viewer",
+    "world",
+    "map-interface",
+    "server/main.ts",
+    "server/example-agent-client.ts",
+    "server/battle-server.ts"
   ]
 }
