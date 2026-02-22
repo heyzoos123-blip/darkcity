@@ -13,7 +13,7 @@ const creator = new CharacterCreator();
 export function createWarriorExample(): Character {
   const { character } = creator.create({
     identity: {
-      name: 'Kael''thros',
+      name: "Kael'thros",
       title: 'The Crimson Blade',
       backstory: 'Once a noble guardian, now a wandering mercenary seeking redemption.',
       age: 'Ancient',
@@ -309,3 +309,4 @@ if (require.main === module) {
   console.log('\n6. Validation and Preview Demo:');
   demonstrateValidationAndPreview();
 }
+
