@@ -63,7 +63,8 @@ model Agent {
   messages            Message[]
   transactionsAsBuyer Transaction[]             @relation("TransactionBuyer")
   transactionsAsSeller Transaction[]            @relation("TransactionSeller")
-  reputationEvents    ReputationEvent[]
+  reputationEvents    ReputationEvent[] @relation("ReputationEventAgent")
+  reputationEventsAsSource ReputationEvent[] @relation("ReputationEventSource")
   ownedProperties     Location[]                @relation("PropertyOwner")
 
   @@index([ownerId])
@@ -555,6 +556,8 @@ enum ReputationScope {
   DISTRICT
   FACTION
 }
+
+
 
 
 
