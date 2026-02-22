@@ -532,8 +532,8 @@ model ReputationEvent {
   timestamp DateTime @default(now())
 
   // Relations
-  agent       Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  sourceAgent Agent? @relation(fields: [sourceAgentId], references: [id])
+  agent       Agent  @relation("ReputationEventAgent", fields: [agentId], references: [id], onDelete: Cascade)
+  sourceAgent Agent? @relation("ReputationEventSource", fields: [sourceAgentId], references: [id])
 
   @@index([agentId, timestamp(sort: Desc)], map: "idx_reputation_agent_time")
   @@map("reputation_events")
@@ -555,4 +555,6 @@ enum ReputationScope {
   DISTRICT
   FACTION
 }
+
+
 
