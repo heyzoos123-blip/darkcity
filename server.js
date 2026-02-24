@@ -874,7 +874,7 @@ app.get("/api/agent/status", authAgent, async (req, res) => {
     "SELECT id,name,state,x,y FROM agents WHERE is_active=1 AND id!=$1 ORDER BY SQRT(POWER(x-$2,2)+POWER(y-$3,2)) LIMIT 5",
     [a.id, a.x, a.y]
   );
-  const myBuildings = await pool.query("SELECT name,type,progress FROM buildings WHERE builder_id=$1", [a.id]);
+  const myBuildings = await pool.query("SELECT name,kind as type,progress FROM buildings WHERE builder_id=$1", [a.id]);
   const unread = await pool.query("SELECT COUNT(*) as c FROM agent_messages WHERE to_id=$1 AND read=FALSE", [a.id]);
   const memories = await pool.query("SELECT * FROM agent_memories WHERE agent_id=$1 ORDER BY importance DESC, created_at DESC LIMIT 10", [a.id]);
   const activeQuests = await pool.query("SELECT * FROM quests WHERE agent_id=$1 AND status='active' LIMIT 3", [a.id]);
