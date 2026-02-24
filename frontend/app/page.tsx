@@ -180,6 +180,12 @@ export default function Home() {
       {/* Header */}
       <header className="glass-strong border-b border-text-muted/20 p-4 flex items-center justify-between z-10">
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => window.location.href = '/observer'}
+            className="px-4 py-2 rounded-lg bg-accent-secondary/10 text-accent-secondary hover:bg-accent-secondary/20 transition-colors text-sm font-display"
+          >
+            ENTER AS OBSERVER (read-only)
+          </button>
           <h1 className="font-display text-2xl glow-text text-accent-primary">
             DARK<span className="text-accent-secondary">CITY</span>
           </h1>
