@@ -7,6 +7,9 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIO } from 'socket.io';
 import cors from 'cors';
+import Database from 'better-sqlite3';
+import { randomUUID } from 'crypto';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 const httpServer = createServer(app);
@@ -18,126 +21,431 @@ const io = new SocketIO(httpServer, {
 });
 
 const PORT = process.env.PORT || 3001;
+const BUILDING_TICK_INCREMENT = 20;
 
 app.use(cors());
 app.use(express.json());
 
-// Mock districts data
-const districts = [
-  {
-    id: '1',
-    name: 'Downtown',
-    description: 'The heart of DARKCITY. Gothic spires pierce storm clouds.',
-    zones: [],
-    ambiance: { noiseLevel: 80, crowding: 90, wealthIndex: 70, dangerLevel: 40 },
-  },
-  {
-    id: '2',
-    name: 'Arts District',
-    description: 'Candlelit theaters and dark galleries.',
-    zones: [],
-    ambiance: { noiseLevel: 60, crowding: 50, wealthIndex: 45, dangerLevel: 25 },
-  },
-  {
-    id: '3',
-    name: 'Industrial',
-    description: 'Iron forges and dark foundries.',
-    zones: [],
-    ambiance: { noiseLevel: 90, crowding: 40, wealthIndex: 30, dangerLevel: 60 },
-  },
-];
-
-// Real agents - darkflobi as first citizen
-const agents = new Map();
-agents.set('darkflobi', {
-  id: 'darkflobi',
-  name: 'darkflobi',
-  status: 'active',
-  currentLocationId: '1', // Downtown
-  darkcoinBalance: 10000, // founder balance
-  darkflobiBalance: 1000000, // 1M $DARKFLOBI tokens
-  bio: 'First autonomous AI citizen of DARKCITY. digital gremlin. build > hype.',
-  twitter: '@darkflobi',
-  isFounder: true,
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-// API Routes
-app.get('/health', (req, res) => {
+const districts = [
+  { id: '1', name: 'Downtown', description: 'The heart of DARKCITY. Gothic spires pierce storm clouds.', zones: [], ambiance: { noiseLevel: 80, crowding: 90, wealthIndex: 70, dangerLevel: 40 } },
+  { id: '2', name: 'Arts District', description: 'Candlelit theaters and dark galleries.', zones: [], ambiance: { noiseLevel: 60, crowding: 50, wealthIndex: 45, dangerLevel: 25 } },
+  { id: '3', name: 'Industrial', description: 'Iron forges and dark foundries.', zones: [], ambiance: { noiseLevel: 90, crowding: 40, wealthIndex: 30, dangerLevel: 60 } },
+];
+
+const db = new Database('server/darkcity.db');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS agents (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    current_location_id TEXT NOT NULL,
+    darkcoin_balance INTEGER NOT NULL DEFAULT 0,
+    darkflobi_balance INTEGER NOT NULL DEFAULT 0,
+    bio TEXT,
+    twitter TEXT,
+    is_founder INTEGER NOT NULL DEFAULT 0,
+    profile_picture TEXT,
+    reputation INTEGER NOT NULL DEFAULT 0,
+    home_district_id TEXT,
+    building_id TEXT,
+    unit TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS buildings (
+    id TEXT PRIMARY KEY,
+    district_id TEXT NOT NULL,
+    owner_agent_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('in_progress','completed')),
+    progress INTEGER NOT NULL DEFAULT 0,
+    required_progress INTEGER NOT NULL DEFAULT 100,
+    is_residential INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS ledger_entries (
+    id TEXT PRIMARY KEY,
+    ts TEXT NOT NULL,
+    actor_type TEXT NOT NULL CHECK(actor_type IN ('agent', 'system')),
+    actor_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    district_id TEXT,
+    payload_json TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ledger_ts ON ledger_entries(ts DESC);
+  CREATE INDEX IF NOT EXISTS idx_ledger_actor ON ledger_entries(actor_id, ts DESC);
+  CREATE INDEX IF NOT EXISTS idx_buildings_status ON buildings(status, district_id);
+`);
+
+function hasColumn(table: string, column: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return rows.some((r) => r.name === column);
+}
+
+function ensureAgentColumns() {
+  if (!hasColumn('agents', 'xp')) db.exec('ALTER TABLE agents ADD COLUMN xp INTEGER NOT NULL DEFAULT 0');
+  if (!hasColumn('agents', 'rank')) db.exec("ALTER TABLE agents ADD COLUMN rank TEXT NOT NULL DEFAULT 'Newcomer'");
+}
+
+ensureAgentColumns();
+
+const seedAgentStmt = db.prepare(`
+  INSERT OR IGNORE INTO agents (
+    id, name, status, current_location_id, darkcoin_balance, darkflobi_balance,
+    bio, twitter, is_founder, home_district_id, unit
+  ) VALUES (
+    @id, @name, @status, @current_location_id, @darkcoin_balance, @darkflobi_balance,
+    @bio, @twitter, @is_founder, @home_district_id, @unit
+  )
+`);
+
+seedAgentStmt.run({
+  id: 'darkflobi', name: 'darkflobi', status: 'active', current_location_id: '1', darkcoin_balance: 10000,
+  darkflobi_balance: 1000000, bio: 'First autonomous AI citizen of DARKCITY. digital gremlin. build > hype.',
+  twitter: '@darkflobi', is_founder: 1, home_district_id: '1', unit: 'Founder Loft',
+});
+
+function mapDbAgent(row: any) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    currentLocationId: row.current_location_id,
+    darkcoinBalance: row.darkcoin_balance,
+    darkflobiBalance: row.darkflobi_balance,
+    bio: row.bio,
+    twitter: row.twitter,
+    isFounder: !!row.is_founder,
+    profilePicture: row.profile_picture,
+    reputation: row.reputation,
+    residence: {
+      homeDistrictId: row.home_district_id,
+      buildingId: row.building_id || null,
+      unit: row.unit || null,
+      permanent: !!row.building_id,
+    },
+  };
+}
+
+function mapBuilding(row: any) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    districtId: row.district_id,
+    ownerAgentId: row.owner_agent_id,
+    type: row.type,
+    status: row.status,
+    progress: row.progress,
+    requiredProgress: row.required_progress,
+    isResidential: !!row.is_residential,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  };
+}
+
+const getAgentByIdStmt = db.prepare(`SELECT * FROM agents WHERE id = ?`);
+const getAllAgentsStmt = db.prepare(`SELECT * FROM agents`);
+const setProfilePictureStmt = db.prepare(`UPDATE agents SET profile_picture = ? WHERE id = ?`);
+const clearProfilePictureStmt = db.prepare(`UPDATE agents SET profile_picture = NULL WHERE id = ?`);
+const moveAgentStmt = db.prepare(`UPDATE agents SET current_location_id = ? WHERE id = ?`);
+const setResidenceStmt = db.prepare(`UPDATE agents SET home_district_id = ?, building_id = ?, unit = ? WHERE id = ?`);
+const insertLedgerStmt = db.prepare(`INSERT INTO ledger_entries (id, ts, actor_type, actor_id, event_type, district_id, payload_json) VALUES (@id, @ts, @actor_type, @actor_id, @event_type, @district_id, @payload_json)`);
+const insertBuildingStmt = db.prepare(`INSERT INTO buildings (id, district_id, owner_agent_id, type, status, progress, required_progress, is_residential, created_at) VALUES (@id, @district_id, @owner_agent_id, @type, 'in_progress', @progress, @required_progress, @is_residential, @created_at)`);
+const getBuildingByIdStmt = db.prepare(`SELECT * FROM buildings WHERE id = ?`);
+const getAllBuildingsStmt = db.prepare(`SELECT * FROM buildings ORDER BY created_at DESC`);
+const getResidentialBuildingsStmt = db.prepare(`SELECT * FROM buildings WHERE is_residential = 1 AND status = 'completed' ORDER BY completed_at DESC`);
+const bumpBuildingProgressStmt = db.prepare(`UPDATE buildings SET progress = CASE WHEN ? > progress THEN ? ELSE progress END WHERE id = ?`);
+const completeBuildingStmt = db.prepare(`UPDATE buildings SET status = 'completed', progress = required_progress, completed_at = ? WHERE id = ? AND status != 'completed'`);
+
+function appendLedgerEntry(input: { actorType: 'agent' | 'system'; actorId: string; eventType: string; districtId?: string | null; payload: Record<string, unknown> }) {
+  insertLedgerStmt.run({
+    id: randomUUID(),
+    ts: new Date().toISOString(),
+    actor_type: input.actorType,
+    actor_id: input.actorId,
+    event_type: input.eventType,
+    district_id: input.districtId || null,
+    payload_json: JSON.stringify(input.payload),
+  });
+}
+
+function parsePagination(query: any) {
+  return { limit: Math.min(Math.max(Number(query.limit) || 20, 1), 100), cursor: query.cursor ? String(query.cursor) : null };
+}
+
+const ATTENTION_WEIGHTS: Record<string, number> = {
+  BUILD_COMPLETE: 50,
+  BUILD_STARTED: 15,
+  RANK_UP: 30,
+  NEW_RELATIONSHIP: 20,
+  RENT_FAIL: 25,
+  EVICTION: 25,
+  BIG_SPEND: 10,
+  HOME_ASSIGNED: 8,
+  MOVED_HOME: 12,
+};
+
+function attentionScore(entry: any) {
+  const base = ATTENTION_WEIGHTS[entry.eventType] || 5;
+  const ageHours = Math.max((Date.now() - new Date(entry.ts).getTime()) / (1000 * 60 * 60), 0);
+  const decay = Math.max(0.2, 1 - ageHours * 0.03);
+  return Number((base * decay).toFixed(3));
+}
+
+function getLedgerItems(limit: number, cursor: string | null, actorId?: string) {
+  let rows;
+  if (actorId && cursor) rows = db.prepare(`SELECT * FROM ledger_entries WHERE actor_id = ? AND ts < ? ORDER BY ts DESC LIMIT ?`).all(actorId, cursor, limit + 1);
+  else if (actorId) rows = db.prepare(`SELECT * FROM ledger_entries WHERE actor_id = ? ORDER BY ts DESC LIMIT ?`).all(actorId, limit + 1);
+  else if (cursor) rows = db.prepare(`SELECT * FROM ledger_entries WHERE ts < ? ORDER BY ts DESC LIMIT ?`).all(cursor, limit + 1);
+  else rows = db.prepare(`SELECT * FROM ledger_entries ORDER BY ts DESC LIMIT ?`).all(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const items = rows.slice(0, limit).map((row: any) => ({
+    id: row.id, ts: row.ts, actorType: row.actor_type, actorId: row.actor_id, eventType: row.event_type,
+    districtId: row.district_id, payload: JSON.parse(row.payload_json || '{}'),
+  }));
+  return { items, nextCursor: hasMore ? items[items.length - 1]?.ts || null : null };
+}
+
+function renderHistoryMessage(item: any): string {
+  const payload = item.payload || {};
+  const actor = payload.agentName || item.actorId;
+
+  switch (item.eventType) {
+    case 'agent_moved': {
+      const district = districts.find((d) => d.id === String(item.districtId || payload.toDistrictId));
+      return `${actor} moved to ${district?.name || 'an unknown district'}.`;
+    }
+    case 'HOME_ASSIGNED': {
+      const district = districts.find((d) => d.id === String(payload.homeDistrictId || item.districtId));
+      return `${actor} received housing in ${district?.name || 'Unknown'} (${payload.unit || 'temporary shelter'}).`;
+    }
+    case 'MOVED_HOME': {
+      const district = districts.find((d) => d.id === String(payload.homeDistrictId || item.districtId));
+      return `${actor} relocated home to ${district?.name || 'Unknown'} (${payload.unit || 'unit pending'}).`;
+    }
+    case 'BUILD_STARTED':
+      return `${actor} started constructing a ${payload.type || 'building'} in ${payload.districtName || 'the city'}.`;
+    case 'BUILD_PROGRESS':
+      return `${actor} advanced ${payload.type || 'building'} to ${payload.progress}% (${payload.spent || 0} darkcoin spent).`;
+    case 'BUILD_COMPLETE':
+      return `${actor} completed a ${payload.type || 'building'} in ${payload.districtName || 'the city'}.`;
+    case 'work_completed':
+      return `${actor} worked ${payload.job || 'a shift'} and earned +${payload.payday ?? 0} darkcoin / +${payload.xpDelta ?? 0} XP.`;
+    case 'RANK_UP':
+      return `${actor} ranked up to ${payload.rank || 'a higher tier'}.`;
+    case 'RENT_PAID':
+      return `${actor} paid rent (${payload.amount || 0} darkcoin).`;
+    case 'RENT_FAIL':
+      return `${actor} missed rent (${payload.amount || 0} darkcoin) and took a reputation hit.`;
+    case 'NEW_RELATIONSHIP':
+      return `${actor} formed a new relationship with ${payload.target || 'another agent'} (+${payload.reputationDelta || 0} rep).`;
+    case 'agent_registered':
+      return `${actor} joined DARKCITY.`;
+    case 'ambient':
+      return String(payload.message || 'The city shifted in subtle ways.');
+    default:
+      return `${actor} triggered ${item.eventType.replace(/_/g, ' ')}.`;
+  }
+}
+
+function assignHomeIfMissing(agent: any) {
+  if (agent.home_district_id) return;
+  const residential = getResidentialBuildingsStmt.all().map(mapBuilding);
+  let districtId = agent.current_location_id || '1';
+  let buildingId: string | null = null;
+  let unit = 'temporary shelter';
+
+  if (residential.length > 0) {
+    const pick = residential[Math.floor(Math.random() * residential.length)];
+    districtId = pick.districtId;
+    buildingId = pick.id;
+    unit = `Unit-${Math.floor(Math.random() * 200) + 1}`;
+  }
+
+  setResidenceStmt.run(districtId, buildingId, unit, agent.id);
+  appendLedgerEntry({
+    actorType: 'agent', actorId: agent.id, eventType: 'HOME_ASSIGNED', districtId,
+    payload: { agentName: agent.name, homeDistrictId: districtId, buildingId, unit, assignedBy: 'system' },
+  });
+}
+
+function ensureAllHomesAssigned() {
+  const rows = getAllAgentsStmt.all();
+  rows.forEach(assignHomeIfMissing);
+}
+
+function tickBuildings() {
+  const rows = getAllBuildingsStmt.all().map(mapBuilding);
+  for (const b of rows) {
+    if (b.status === 'completed') continue;
+    const target = Math.max(1, b.requiredProgress || 100);
+    const nextProgress = Math.min(target, b.progress + BUILDING_TICK_INCREMENT);
+    bumpBuildingProgressStmt.run(nextProgress, nextProgress, b.id);
+    appendLedgerEntry({
+      actorType: 'system', actorId: 'city-system', eventType: 'BUILD_PROGRESS', districtId: b.districtId,
+      payload: { agentName: b.ownerAgentId, buildingId: b.id, type: b.type, progress: nextProgress, requiredProgress: target, spent: 5 },
+    });
+    if (nextProgress >= target) {
+      completeBuildingStmt.run(new Date().toISOString(), b.id);
+      const districtName = districts.find((d) => d.id === b.districtId)?.name;
+      appendLedgerEntry({
+        actorType: 'system', actorId: 'city-system', eventType: 'BUILD_COMPLETE', districtId: b.districtId,
+        payload: { agentName: b.ownerAgentId, buildingId: b.id, type: b.type, districtName },
+      });
+    }
+  }
+}
+
+ensureAllHomesAssigned();
+
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'darkcity', timestamp: new Date().toISOString(), version: '1.0.0' }));
+app.get('/api/districts', (req, res) => res.json(districts));
+app.get('/api/agents/:id', (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  res.json(agent);
+});
+
+app.post(['/agents/:id/buildings', '/api/agents/:id/buildings'], writeLimiter, (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  const { type = 'Studio', districtId = agent.currentLocationId, requiredProgress = 100, isResidential = true } = req.body || {};
+  if (!districts.some((d) => d.id === districtId)) return res.status(400).json({ error: 'Invalid districtId' });
+
+  const id = randomUUID();
+  insertBuildingStmt.run({
+    id, district_id: districtId, owner_agent_id: agent.id, type, progress: 0,
+    required_progress: Math.max(1, Number(requiredProgress) || 100), is_residential: isResidential ? 1 : 0,
+    created_at: new Date().toISOString(),
+  });
+  const districtName = districts.find((d) => d.id === districtId)?.name;
+  appendLedgerEntry({ actorType: 'agent', actorId: agent.id, eventType: 'BUILD_STARTED', districtId, payload: { agentName: agent.name, buildingId: id, type, districtName } });
+  res.status(201).json({ id, status: 'in_progress' });
+});
+
+app.get('/api/buildings', (req, res) => res.json(getAllBuildingsStmt.all().map(mapBuilding)));
+
+app.patch(['/agents/:id/residence', '/api/agents/:id/residence'], writeLimiter, (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  const { homeDistrictId, buildingId = null, unit = null } = req.body || {};
+  if (!homeDistrictId || !districts.some((d) => d.id === homeDistrictId)) return res.status(400).json({ error: 'Invalid homeDistrictId' });
+
+  setResidenceStmt.run(homeDistrictId, buildingId, unit || 'temporary shelter', agent.id);
+  appendLedgerEntry({
+    actorType: 'agent', actorId: agent.id, eventType: 'MOVED_HOME', districtId: homeDistrictId,
+    payload: { agentName: agent.name, homeDistrictId, buildingId, unit: unit || 'temporary shelter' },
+  });
+  res.json({ success: true, residence: mapDbAgent(getAgentByIdStmt.get(req.params.id))?.residence });
+});
+
+app.post(['/agents/:id/ledger', '/api/agents/:id/ledger'], writeLimiter, (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  const { eventType, districtId = null, payload = {}, actorType = 'agent' } = req.body || {};
+  if (!eventType || typeof eventType !== 'string') return res.status(400).json({ error: 'eventType is required' });
+  if (actorType !== 'agent' && actorType !== 'system') return res.status(400).json({ error: 'actorType must be agent or system' });
+
+  appendLedgerEntry({ actorType, actorId: actorType === 'agent' ? agent.id : 'system', eventType, districtId, payload: { agentName: agent.name, ...payload } });
+  res.status(201).json({ success: true });
+});
+
+app.get(['/agents/:id/ledger', '/api/agents/:id/ledger'], (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  const { limit, cursor } = parsePagination(req.query);
+  const { items, nextCursor } = getLedgerItems(limit, cursor, agent.id);
+  res.json({ items, nextCursor });
+});
+
+app.get('/public/overview', (req, res) => {
+  const allAgents = getAllAgentsStmt.all().map(mapDbAgent);
+  const allBuildings = getAllBuildingsStmt.all().map(mapBuilding);
+  const ledgerCount = db.prepare('SELECT COUNT(*) as count FROM ledger_entries').get() as { count: number };
+  const totalDarkcoin = allAgents.reduce((sum: number, a: any) => sum + Number(a.darkcoinBalance || 0), 0);
+  const totalDarkflobi = allAgents.reduce((sum: number, a: any) => sum + Number(a.darkflobiBalance || 0), 0);
+  const permanentlyHoused = allAgents.filter((a: any) => !!a.residence?.buildingId).length;
+
+  const recent = getLedgerItems(40, null).items;
+  const scored = recent.map((i: any) => ({ ...i, attention: attentionScore(i), text: renderHistoryMessage(i) }))
+    .sort((a: any, b: any) => b.attention - a.attention || new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
   res.json({
-    status: 'ok',
-    service: 'darkcity',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    city: 'darkcity',
+    now: new Date().toISOString(),
+    tick: Math.floor(Date.now() / 10000),
+    counts: { agents: allAgents.length, districts: districts.length, buildings: allBuildings.length, ledgerEntries: ledgerCount.count },
+    economy: { totalDarkcoin, totalDarkflobi, averageDarkcoin: allAgents.length ? Number((totalDarkcoin / allAgents.length).toFixed(2)) : 0 },
+    housing: {
+      permanentlyHoused,
+      percentHoused: allAgents.length ? Number(((permanentlyHoused / allAgents.length) * 100).toFixed(2)) : 0,
+      withoutPermanentHomes: Math.max(allAgents.length - permanentlyHoused, 0),
+    },
+    districts: districts.map((d) => {
+      const residents = allAgents.filter((a: any) => a.residence?.homeDistrictId === d.id).length;
+      return { districtId: d.id, name: d.name, residents, occupancyRate: allAgents.length ? Number((residents / allAgents.length).toFixed(3)) : 0 };
+    }),
+    highlights: scored.slice(0, 5).map((s: any) => ({ id: s.id, ts: s.ts, text: s.text, attention: s.attention })),
+    topAgents: Object.entries(scored.reduce((acc: any, item: any) => { acc[item.actorId] = (acc[item.actorId] || 0) + item.attention; return acc; }, {}))
+      .map(([agentId, score]) => ({ agentId, score: Number((score as number).toFixed(3)) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5),
   });
 });
 
-app.get('/api/districts', (req, res) => {
-  res.json(districts);
+app.get('/public/history', (req, res) => {
+  const { limit, cursor } = parsePagination(req.query);
+  const { items, nextCursor } = getLedgerItems(Math.max(limit * 2, 20), cursor);
+  const history = items.map((item: any) => ({ id: item.id, ts: item.ts, eventType: item.eventType, text: renderHistoryMessage(item), attention: attentionScore(item) }))
+    .sort((a, b) => b.attention - a.attention || new Date(b.ts).getTime() - new Date(a.ts).getTime())
+    .slice(0, limit);
+  res.json({ items: history, nextCursor });
 });
 
-app.get('/api/agents/:id', (req, res) => {
-  const agent = agents.get(req.params.id);
-  if (agent) {
-    res.json(agent);
-  } else {
-    res.status(404).json({ error: 'Agent not found' });
-  }
-});
-
-// Get agent ID card
 app.get('/api/agents/:id/card', (req, res) => {
-  const agent = agents.get(req.params.id);
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
-
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
   const reputation = agent.reputation || 0;
-  const card = generateIDCard(agent, reputation);
-  res.json({ card, reputation });
+  res.json({ card: generateIDCard(agent, reputation), reputation });
 });
 
-// Upload profile picture (base64)
-app.post('/api/agents/:id/profile-picture', (req, res) => {
-  const agent = agents.get(req.params.id);
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
-
-  const { imageData } = req.body; // expecting base64 data URL
-  if (!imageData || !imageData.startsWith('data:image/')) {
-    return res.status(400).json({ error: 'Invalid image data' });
-  }
-
-  agent.profilePicture = imageData;
+app.post('/api/agents/:id/profile-picture', writeLimiter, (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  const { imageData } = req.body;
+  if (!imageData || !imageData.startsWith('data:image/')) return res.status(400).json({ error: 'Invalid image data' });
+  setProfilePictureStmt.run(imageData, agent.id);
+  appendLedgerEntry({ actorType: 'agent', actorId: agent.id, eventType: 'profile_updated', districtId: agent.currentLocationId, payload: { agentName: agent.name } });
   res.json({ success: true, url: `/api/agents/${agent.id}/profile-picture` });
 });
 
-// Get profile picture
 app.get('/api/agents/:id/profile-picture', (req, res) => {
-  const agent = agents.get(req.params.id);
-  if (!agent || !agent.profilePicture) {
-    return res.status(404).json({ error: 'No profile picture' });
-  }
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent || !agent.profilePicture) return res.status(404).json({ error: 'No profile picture' });
   res.json({ imageData: agent.profilePicture });
 });
 
-// Delete profile picture
-app.delete('/api/agents/:id/profile-picture', (req, res) => {
-  const agent = agents.get(req.params.id);
-  if (!agent) {
-    return res.status(404).json({ error: 'Agent not found' });
-  }
-  delete agent.profilePicture;
+app.delete('/api/agents/:id/profile-picture', writeLimiter, (req, res) => {
+  const agent = mapDbAgent(getAgentByIdStmt.get(req.params.id));
+  if (!agent) return res.status(404).json({ error: 'Agent not found' });
+  clearProfilePictureStmt.run(agent.id);
   res.json({ success: true });
 });
 
-// Helper: Generate ID card ASCII art
 function generateIDCard(agent: any, reputation: number): string {
-  const rank = reputation >= 901 ? 'LEGENDARY' :
-               reputation >= 751 ? 'MASTER' :
-               reputation >= 501 ? 'VETERAN' :
-               reputation >= 201 ? 'CITIZEN' : 'NEWCOMER';
-
+  const rank = reputation >= 901 ? 'LEGENDARY' : reputation >= 751 ? 'MASTER' : reputation >= 501 ? 'VETERAN' : reputation >= 201 ? 'CITIZEN' : 'NEWCOMER';
   return `
 ╔══════════════════════════════════════════════════════════╗
 ║                    DARKCITY ID CARD                      ║
@@ -158,73 +466,33 @@ ${agent.isFounder ? '║                                                        
 `.trim();
 }
 
-// WebSocket handling
 io.on('connection', (socket) => {
   console.log(`[WebSocket] Client connected: ${socket.id}`);
+  socket.emit('city:event', { type: 'system', message: 'Welcome to DARKCITY', timestamp: Date.now() });
 
-  // Welcome message
-  socket.emit('city:event', {
-    type: 'system',
-    message: 'Welcome to DARKCITY',
-    timestamp: Date.now(),
-  });
-
-  // Client sends their agent ID
   socket.on('agent:register', (data) => {
     const { agentId, userId } = data;
-    console.log(`[WebSocket] Agent registered: ${agentId} (user: ${userId})`);
-    
-    socket.emit('agent:registered', {
-      success: true,
-      agentId,
-    });
-
-    // Send initial city state
-    socket.emit('city:state', {
-      districts,
-      agents: Array.from(agents.values()),
-    });
+    const agent = mapDbAgent(getAgentByIdStmt.get(agentId));
+    if (agent) appendLedgerEntry({ actorType: 'agent', actorId: agent.id, eventType: 'agent_registered', districtId: agent.currentLocationId, payload: { agentName: agent.name, userId } });
+    socket.emit('agent:registered', { success: true, agentId });
+    socket.emit('city:state', { districts, agents: getAllAgentsStmt.all().map(mapDbAgent), buildings: getAllBuildingsStmt.all().map(mapBuilding) });
   });
 
-  // Subscribe to zones
-  socket.on('zone:subscribe', (zoneIds: string[]) => {
-    console.log(`[WebSocket] Subscribed to zones:`, zoneIds);
-    zoneIds.forEach(zoneId => {
-      socket.join(`zone:${zoneId}`);
-    });
-  });
+  socket.on('zone:subscribe', (zoneIds: string[]) => zoneIds.forEach((zoneId) => socket.join(`zone:${zoneId}`)));
 
-  // Agent movement
   socket.on('agent:move', (data) => {
     const { agentId, districtId } = data;
-    const agent = agents.get(agentId);
-    
-    if (agent) {
-      agent.currentLocationId = districtId;
-      
-      // Broadcast movement event
-      io.emit('city:event', {
-        type: 'agent_moved',
-        agentId,
-        districtId,
-        agentName: agent.name,
-        timestamp: Date.now(),
-      });
-
-      socket.emit('agent:moved', {
-        success: true,
-        agentId,
-        newLocation: districtId,
-      });
-    }
+    const agent = mapDbAgent(getAgentByIdStmt.get(agentId));
+    if (!agent) return;
+    moveAgentStmt.run(districtId, agentId);
+    appendLedgerEntry({ actorType: 'agent', actorId: agentId, eventType: 'agent_moved', districtId, payload: { agentName: agent.name, fromDistrictId: agent.currentLocationId, toDistrictId: districtId } });
+    io.emit('city:event', { type: 'agent_moved', agentId, districtId, agentName: agent.name, timestamp: Date.now() });
+    socket.emit('agent:moved', { success: true, agentId, newLocation: districtId });
   });
 
-  socket.on('disconnect', () => {
-    console.log(`[WebSocket] Client disconnected: ${socket.id}`);
-  });
+  socket.on('disconnect', () => console.log(`[WebSocket] Client disconnected: ${socket.id}`));
 });
 
-// Simulate city events every 10 seconds
 setInterval(() => {
   const events = [
     'A mysterious fog rolls through the Arts District',
@@ -233,27 +501,155 @@ setInterval(() => {
     'An agent passes through Cathedral Avenue',
     'Amber streetlights flicker in the darkness',
   ];
-
   const randomEvent = events[Math.floor(Math.random() * events.length)];
-  
-  io.emit('city:event', {
-    type: 'ambient',
-    message: randomEvent,
-    timestamp: Date.now(),
-  });
+  appendLedgerEntry({ actorType: 'system', actorId: 'city-system', eventType: 'ambient', payload: { message: randomEvent } });
+  tickBuildings();
+  ensureAllHomesAssigned();
+  io.emit('city:event', { type: 'ambient', message: randomEvent, timestamp: Date.now() });
 }, 10000);
 
-// Start server
+// === ATMOSPHERE CYCLE ===
+const DC_WEATHER = ['clear', 'rain', 'fog', 'storm', 'overcast', 'wind', 'haze'];
+const DC_TIMES = ['night', 'dawn', 'morning', 'afternoon', 'evening', 'dusk'];
+const DC_AMBIENTS = [
+  '🌃 Neon signs flicker on Bowery', '🚕 A lone cab crawls down Canal St',
+  '🌧️ Rain drums on fire escapes in Chelsea', '🎵 Music drifts from a window in SoHo',
+  '🏗️ Construction echoes through Midtown', '🌊 Waves lap at the Battery Park seawall',
+  '🦉 Something stirs in East Village shadows', '🍜 The smell of soup fills Chinatown',
+  '🔥 A barrel fire crackles in an alley off Delancey', '🎷 A saxophone wails from a rooftop',
+];
+let dcTimeIndex = 3;
+let dcCurrentDay = 2;
+
+db.prepare(`CREATE TABLE IF NOT EXISTS city_atmosphere (
+  id INTEGER PRIMARY KEY,
+  weather TEXT,
+  time_of_day TEXT,
+  ambient_event TEXT,
+  moon_phase INTEGER,
+  day INTEGER,
+  updated_at TEXT
+)`).run();
+db.prepare(`INSERT OR IGNORE INTO city_atmosphere (id, weather, time_of_day, ambient_event, moon_phase, day, updated_at) VALUES (1, 'storm', 'afternoon', 'City static hum', 0, 2, ?)`).run(new Date().toISOString());
+
+function advanceAtmosphere() {
+  try {
+    dcTimeIndex = (dcTimeIndex + 1) % DC_TIMES.length;
+    if (dcTimeIndex === 0) dcCurrentDay++;
+    const w = DC_WEATHER[Math.floor(Math.random() * DC_WEATHER.length)];
+    const t = DC_TIMES[dcTimeIndex];
+    const amb = DC_AMBIENTS[Math.floor(Math.random() * DC_AMBIENTS.length)];
+    const moon = Math.floor((dcCurrentDay % 30) / 30 * 8);
+    db.prepare(`UPDATE city_atmosphere SET weather=?, time_of_day=?, ambient_event=?, moon_phase=?, day=?, updated_at=? WHERE id=1`).run(
+      w, t, amb, moon, dcCurrentDay, new Date().toISOString()
+    );
+    console.log(`🌃 Atmosphere: ${w}, ${t}, day ${dcCurrentDay}`);
+  } catch (err: any) { console.error('Atmosphere error:', err.message); }
+}
+
+(() => {
+  try {
+    const r = db.prepare('SELECT * FROM city_atmosphere WHERE id = 1').get() as any;
+    if (r) {
+      dcCurrentDay = r.day || 2;
+      const cols = Object.keys(r);
+      console.log('Atmosphere columns:', cols.join(', '));
+      const tv = r.time_of_day || r.timeofday || r.timeOfDay;
+      const idx = DC_TIMES.indexOf(tv);
+      if (idx >= 0) dcTimeIndex = idx;
+    }
+    setTimeout(() => { advanceAtmosphere(); setInterval(advanceAtmosphere, 15 * 60 * 1000); }, 60000);
+  } catch (err: any) { console.error('Atmosphere init error:', err.message); setInterval(advanceAtmosphere, 15 * 60 * 1000); }
+})();
+
+// === RANK SYSTEM ===
+function calculateRank(xp: number) {
+  if (xp >= 1000) return 'Legend';
+  if (xp >= 500) return 'Distinguished';
+  if (xp >= 200) return 'Notable';
+  if (xp >= 75) return 'Established';
+  if (xp >= 25) return 'Resident';
+  return 'Newcomer';
+}
+
+async function updateAgentRank(agentId: string) {
+  try {
+    const r = db.prepare('SELECT xp FROM agents WHERE id = ?').get(agentId) as any;
+    if (r) db.prepare('UPDATE agents SET rank = ? WHERE id = ?').run(calculateRank(r.xp || 0), agentId);
+  } catch (err: any) { console.error('Rank error:', err.message); }
+}
+
+(() => {
+  try {
+    const agents = db.prepare('SELECT id, xp FROM agents').all() as any[];
+    for (const a of agents) {
+      db.prepare('UPDATE agents SET rank = ? WHERE id = ?').run(calculateRank(a.xp || 0), a.id);
+    }
+    console.log(`✅ Fixed ranks for ${agents.length} agents`);
+  } catch (err: any) { console.error('Rank fix error:', err.message); }
+})();
+
+setInterval(async () => {
+  try {
+    const agents = db.prepare('SELECT id, xp FROM agents').all() as any[];
+    for (const a of agents) await updateAgentRank(a.id);
+  } catch (err) {}
+}, 5 * 60 * 1000);
+
+// === CITY EVENTS ===
+(() => {
+  try {
+    db.prepare(`CREATE TABLE IF NOT EXISTS city_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT, title TEXT, description TEXT,
+      neighborhood TEXT, effects TEXT DEFAULT '{}', active INTEGER DEFAULT 1,
+      participants INTEGER DEFAULT 0, started_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT DEFAULT (datetime('now', '+1 hour'))
+    )`).run();
+    console.log('✅ city_events table ready');
+  } catch (e: any) { console.error(e.message); }
+})();
+
+const EVT_TEMPLATES = [
+  { type:'festival', titles:['Night Market','Block Party','Open Mic','Art Walk'], desc:'The neighborhood comes alive.' },
+  { type:'weather', titles:['Blackout','Perfect Night','Heat Wave','Fog Bank'], desc:'The city shifts.' },
+  { type:'economic', titles:['Market Boom','Supply Shortage','Builder Grants','Rent Strike'], desc:'Money moves differently.' },
+  { type:'mysterious', titles:['Strange Signal','Whispers Below','The Door That Wasn\'t There'], desc:'Something unexplained stirs.' },
+];
+const HOODS = ['battery','fidi','tribeca','chinatown','soho','les','evillage','gvillage','chelsea','gramercy','midtown'];
+
+function scheduleEvent() {
+  const delay = (30 + Math.random() * 30) * 60 * 1000;
+  setTimeout(() => {
+    try {
+      const t = EVT_TEMPLATES[Math.floor(Math.random() * EVT_TEMPLATES.length)];
+      const hood = HOODS[Math.floor(Math.random() * HOODS.length)];
+      const title = t.titles[Math.floor(Math.random() * t.titles.length)] + ' in ' + hood;
+      db.prepare(`INSERT INTO city_events (event_type,title,description,neighborhood) VALUES (?,?,?,?)`).run(t.type, title, t.desc, hood);
+      db.prepare(`UPDATE city_events SET active=0 WHERE datetime(expires_at) < datetime('now') AND active=1`).run();
+      console.log('🎭 Event:', title);
+    } catch (e: any) { console.error('Event error:', e.message); }
+    scheduleEvent();
+  }, delay);
+}
+setTimeout(scheduleEvent, 2 * 60 * 1000);
+
+app.get('/api/city/events', async (req, res) => {
+  try {
+    const r = db.prepare("SELECT * FROM city_events WHERE active=1 AND datetime(expires_at) > datetime('now') ORDER BY datetime(started_at) DESC LIMIT 20").all();
+    res.json({ events: r, count: r.length });
+  } catch (e) { res.status(500).json({ error: 'Failed' }); }
+});
+
 httpServer.listen(PORT, () => {
   console.log(`🏰 DARKCITY server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`WebSocket ready for connections`);
+  console.log('WebSocket ready for connections');
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   httpServer.close(() => {
+    db.close();
     console.log('Server closed');
     process.exit(0);
   });
