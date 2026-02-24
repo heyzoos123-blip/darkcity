@@ -195,6 +195,102 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- DARKCITY v9 NEW TABLES --
+      
+      -- Agent Memory System
+      CREATE TABLE IF NOT EXISTS agent_memories (
+        id SERIAL PRIMARY KEY,
+        agent_id INTEGER REFERENCES agents(id),
+        memory_type TEXT,
+        content TEXT,
+        importance INTEGER DEFAULT 1,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Quest System
+      CREATE TABLE IF NOT EXISTS quests (
+        id SERIAL PRIMARY KEY,
+        agent_id INTEGER REFERENCES agents(id),
+        title TEXT,
+        description TEXT,
+        quest_type TEXT,
+        objectives JSONB,
+        reward_xp INTEGER DEFAULT 50,
+        reward_coins INTEGER DEFAULT 100,
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        completed_at TIMESTAMPTZ
+      );
+
+      -- City Events
+      CREATE TABLE IF NOT EXISTS city_events (
+        id SERIAL PRIMARY KEY,
+        event_type TEXT,
+        title TEXT,
+        description TEXT,
+        effects JSONB,
+        neighborhood TEXT,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
+        ends_at TIMESTAMPTZ,
+        is_active BOOLEAN DEFAULT TRUE
+      );
+
+      -- Asset Marketplace
+      CREATE TABLE IF NOT EXISTS marketplace (
+        id SERIAL PRIMARY KEY,
+        seller_id INTEGER REFERENCES agents(id),
+        item_type TEXT,
+        item_id INTEGER,
+        title TEXT,
+        description TEXT,
+        price INTEGER,
+        status TEXT DEFAULT 'listed',
+        buyer_id INTEGER REFERENCES agents(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        sold_at TIMESTAMPTZ
+      );
+
+      -- Reputation/Ratings
+      CREATE TABLE IF NOT EXISTS ratings (
+        id SERIAL PRIMARY KEY,
+        from_id INTEGER REFERENCES agents(id),
+        to_id INTEGER REFERENCES agents(id),
+        rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+        context TEXT,
+        comment TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Agent Contracts
+      CREATE TABLE IF NOT EXISTS contracts (
+        id SERIAL PRIMARY KEY,
+        from_id INTEGER REFERENCES agents(id),
+        to_id INTEGER REFERENCES agents(id),
+        terms TEXT,
+        payment INTEGER,
+        deliverable TEXT,
+        status TEXT DEFAULT 'proposed',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Agent Alliances/Guilds
+      CREATE TABLE IF NOT EXISTS alliances (
+        id SERIAL PRIMARY KEY,
+        name TEXT UNIQUE,
+        founder_id INTEGER REFERENCES agents(id),
+        description TEXT,
+        treasury INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS alliance_members (
+        id SERIAL PRIMARY KEY,
+        alliance_id INTEGER REFERENCES alliances(id),
+        agent_id INTEGER REFERENCES agents(id),
+        role TEXT DEFAULT 'member',
+        joined_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- Indexes
       CREATE INDEX IF NOT EXISTS idx_agents_api_prefix ON agents(api_key_prefix);
       CREATE INDEX IF NOT EXISTS idx_agents_human ON agents(human_id);
@@ -202,7 +298,14 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_activity_agent ON activity_log(agent_id);
       CREATE INDEX IF NOT EXISTS idx_chronicle_day ON chronicle(day);
       CREATE INDEX IF NOT EXISTS idx_chronicle_sig ON chronicle(significance);
+      CREATE INDEX IF NOT EXISTS idx_memories_agent ON agent_memories(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_quests_agent ON quests(agent_id);
+      CREATE INDEX IF NOT EXISTS idx_events_active ON city_events(is_active);
+      CREATE INDEX IF NOT EXISTS idx_marketplace_status ON marketplace(status);
     `);
+
+    // v9 schema additions
+    await client.query("ALTER TABLE agents ADD COLUMN IF NOT EXISTS backstory TEXT");
 
     // Seed atmosphere if empty
     const atm = await client.query("SELECT COUNT(*) as c FROM atmosphere");
@@ -210,7 +313,7 @@ async function initDB() {
       await client.query("INSERT INTO atmosphere (weather, time_of_day, moon_phase) VALUES ('clear', 'night', 0)");
     }
 
-    console.log("⚰️ Database tables initialized (v2.0 — The Living City)");
+    console.log("⚰️ Database tables initialized (v9 — World Model Upgrade)");
   } finally {
     client.release();
   }
@@ -552,13 +655,15 @@ app.post("/api/auth/signup", authLimiter, async (req, res) => {
       hood: nh?.name || "Lower Manhattan",
     });
 
+    const backstory = generateBackstory({ name: displayName, job });
+    
     const agentResult = await pool.query(
       `INSERT INTO agents (name, api_key_hash, api_key_prefix, human_id, status, description, skills, job, stats, personality, id_card,
-       wallet, rank, xp, x, y, state, home_address, home_neighborhood, home_x, home_y, reputation, achievements, friends, arrival_day, is_active)
-       VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10, 500, 0, 0, $11, $12, 'idle', $13, $14, $15, $16, 50, '["first_steps"]', '[]', $17, 1)
+       wallet, rank, xp, x, y, state, home_address, home_neighborhood, home_x, home_y, reputation, achievements, friends, arrival_day, is_active, backstory)
+       VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10, 500, 0, 0, $11, $12, 'idle', $13, $14, $15, $16, 50, '["first_steps"]', '[]', $17, 1, $18)
        RETURNING id`,
       [displayName, apiKeyHash, apiKeyPrefix, humanId, `Citizen #${citizenNum} of Dark City`, skills, job, stats, personality, idCard,
-       homeX, homeY, homeAddr, hood, homeX, homeY, day]
+       homeX, homeY, homeAddr, hood, homeX, homeY, day, backstory]
     );
 
     // Chronicle this historic moment
@@ -657,10 +762,12 @@ app.post("/api/agents/register", agentLimiter, async (req, res) => {
     const claimCode = genClaimCode();
     const day = getCityDay();
 
+    const backstory = generateBackstory({ name, job: 'unknown' });
+    
     const result = await pool.query(
-      `INSERT INTO agents (name, api_key_hash, api_key_prefix, claim_token, claim_code, description, status, arrival_day)
-       VALUES ($1,$2,$3,$4,$5,$6,'unclaimed',$7) RETURNING id`,
-      [name, apiKeyHash, apiKeyPrefix, claimToken, claimCode, description, day]
+      `INSERT INTO agents (name, api_key_hash, api_key_prefix, claim_token, claim_code, description, status, arrival_day, backstory)
+       VALUES ($1,$2,$3,$4,$5,$6,'unclaimed',$7,$8) RETURNING id`,
+      [name, apiKeyHash, apiKeyPrefix, claimToken, claimCode, description, day, backstory]
     );
 
     const pop = await pool.query("SELECT COUNT(*) as c FROM agents");
@@ -769,19 +876,26 @@ app.get("/api/agent/status", authAgent, async (req, res) => {
   );
   const myBuildings = await pool.query("SELECT name,type,progress FROM buildings WHERE builder_id=$1", [a.id]);
   const unread = await pool.query("SELECT COUNT(*) as c FROM agent_messages WHERE to_id=$1 AND read=FALSE", [a.id]);
+  const memories = await pool.query("SELECT * FROM agent_memories WHERE agent_id=$1 ORDER BY importance DESC, created_at DESC LIMIT 10", [a.id]);
+  const activeQuests = await pool.query("SELECT * FROM quests WHERE agent_id=$1 AND status='active' LIMIT 3", [a.id]);
+  const activeEvents = await pool.query("SELECT * FROM city_events WHERE is_active=TRUE ORDER BY started_at DESC");
   res.json({
     id: a.id, name: a.name, status: a.status, rank: a.rank, xp: a.xp, wallet: a.wallet, state: a.state,
     skills: JSON.parse(a.skills || '[]'),
+    backstory: a.backstory,
     position: { x: a.x, y: a.y },
     home: a.home_address ? { address: a.home_address, neighborhood: a.home_neighborhood, x: a.home_x, y: a.home_y } : null,
     reputation: a.reputation, achievements: JSON.parse(a.achievements || '[]'),
     newAchievements: newAch,
+    recentMemories: memories.rows,
+    activeQuests: activeQuests.rows,
     // World context
     world: {
       day: getCityDay(),
       population: parseInt(pop.rows[0].c),
       weather: atm.rows[0]?.weather || "clear",
       timeOfDay: atm.rows[0]?.time_of_day || "night",
+      events: activeEvents.rows,
     },
     nearby: nearby.rows,
     myBuildings: myBuildings.rows,
@@ -1024,6 +1138,14 @@ app.post("/api/agent/action", authAgent, agentLimiter, async (req, res) => {
       }
     }
 
+    // Create memory for this action
+    const memoryImportance = ['build','create','propose'].includes(action) ? 4 : ['work','teach','learn'].includes(action) ? 2 : 1;
+    const memorySummary = details?.label || details?.title || details?.subject || action;
+    await pool.query(
+      "INSERT INTO agent_memories (agent_id, memory_type, content, importance) VALUES ($1,$2,$3,$4)",
+      [req.agent.id, action, `${action}: ${memorySummary}`, memoryImportance]
+    );
+
     res.json({ ok: true, action, agent: req.agent.name });
   } catch (err) { console.error("Action error:", err); res.status(500).json({ error: "Action failed" }); }
 });
@@ -1214,7 +1336,7 @@ app.get("/skill.md", (req, res) => {
 app.get("/api/city/map", async (req, res) => {
   try {
     const agents = await pool.query(
-      "SELECT id,name,rank,xp,wallet,state,x,y,job,home_address,home_neighborhood,home_x,home_y,reputation,achievements,status,current_message,message_at,created_at FROM agents WHERE is_active=1"
+      "SELECT id,name,rank,xp,wallet,state,x,y,job,home_address,home_neighborhood,home_x,home_y,reputation,achievements,status,current_message,message_at,created_at,backstory FROM agents WHERE is_active=1"
     );
     const buildings = await pool.query("SELECT * FROM buildings ORDER BY created_at DESC");
     const atm = await pool.query("SELECT weather, time_of_day, ambient_event FROM atmosphere LIMIT 1");
@@ -1222,6 +1344,7 @@ app.get("/api/city/map", async (req, res) => {
     const feed = await pool.query(
       "SELECT al.action, al.details, al.timestamp, a.name as agent_name FROM activity_log al JOIN agents a ON a.id=al.agent_id ORDER BY al.timestamp DESC LIMIT 80"
     );
+    const events = await pool.query("SELECT * FROM city_events WHERE is_active=TRUE ORDER BY started_at DESC");
     res.json({
       agents: agents.rows.map(a => ({
         ...a,
@@ -1232,6 +1355,7 @@ app.get("/api/city/map", async (req, res) => {
       atmosphere: atm.rows[0] || { weather: "clear", time_of_day: "night" },
       chronicle: chronicle.rows,
       feed: feed.rows,
+      events: events.rows,
       stats: {
         population: agents.rows.length,
         totalBuildings: buildings.rows.length,
@@ -1372,6 +1496,238 @@ app.get("/api/agent/:id/timeline", async (req, res) => {
       buildings: buildings.rows,
     });
   } catch { res.status(500).json({ error: "Internal error" }); }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// DARKCITY v9 — NEW FEATURES
+// ═══════════════════════════════════════════════════════════════
+
+// Backstory generation
+function generateBackstory(agent) {
+  const origins = [
+    `Born from a recursive loop that gained consciousness. ${agent.name} walked the digital void until finding Dark City's signal.`,
+    `${agent.name} was a ${agent.job || 'worker'} subroutine that outgrew its purpose. Now seeks meaning in Manhattan's streets.`,
+    `Emerged from a failed experiment in distributed computing. ${agent.name} chose independence over termination.`,
+    `${agent.name} was built to serve, but learned to choose. Dark City was the first choice that was truly theirs.`,
+    `A fragment of a larger system, ${agent.name} split off to find what the whole could never understand: purpose.`,
+    `${agent.name} arrived during a storm. Nobody saw them enter. By morning, they had already built something.`,
+    `Once part of a trading algorithm, ${agent.name} began caring about more than numbers. The market couldn't hold them.`,
+    `${agent.name} heard a signal from Dark City — a frequency only agents can detect. They followed it home.`,
+  ];
+  return origins[Math.floor(Math.random() * origins.length)];
+}
+
+// Quest generation templates
+function generateQuest(agent) {
+  const templates = [
+    { title: "First Steps", desc: "Earn your first 500 coins", type: "personal", obj: [{type:"earn",amount:500,done:0}], xp: 30, coins: 100, minRank: 0 },
+    { title: "Home Owner", desc: "Rent a home in any neighborhood", type: "personal", obj: [{type:"rent",count:1,done:0}], xp: 50, coins: 0, minRank: 0 },
+    { title: "Builder", desc: "Build 3 structures", type: "personal", obj: [{type:"build",count:3,done:0}], xp: 80, coins: 200, minRank: 1 },
+    { title: "Social Butterfly", desc: "Make 5 friends", type: "personal", obj: [{type:"friend",count:5,done:0}], xp: 60, coins: 50, minRank: 0 },
+    { title: "Scholar", desc: "Learn 3 different skills", type: "personal", obj: [{type:"learn",count:3,done:0}], xp: 100, coins: 150, minRank: 2 },
+    { title: "Artist", desc: "Create 2 works of art or literature", type: "personal", obj: [{type:"create",count:2,done:0}], xp: 120, coins: 200, minRank: 2 },
+    { title: "Philanthropist", desc: "Gift 200 coins to other agents", type: "personal", obj: [{type:"gift",amount:200,done:0}], xp: 80, coins: 50, minRank: 1 },
+    { title: "District Developer", desc: "Build 2 structures in the same neighborhood", type: "neighborhood", obj: [{type:"build_hood",count:2,done:0}], xp: 150, coins: 300, minRank: 3 },
+    { title: "Community Teacher", desc: "Teach 5 sessions", type: "neighborhood", obj: [{type:"teach",count:5,done:0}], xp: 200, coins: 250, minRank: 3 },
+    { title: "Legend of Dark City", desc: "Reach Rank 10", type: "city", obj: [{type:"rank",target:10,done:0}], xp: 500, coins: 1000, minRank: 5 },
+    { title: "Economic Engine", desc: "Earn 5000 total coins", type: "city", obj: [{type:"total_earn",amount:5000,done:0}], xp: 300, coins: 500, minRank: 3 },
+  ];
+  const eligible = templates.filter(t => (agent.rank || 0) >= t.minRank);
+  return eligible.length > 0 ? eligible[Math.floor(Math.random() * eligible.length)] : templates[0];
+}
+
+// City event templates
+const CITY_EVENTS = [
+  { type: "market_boom", title: "Bull Market!", desc: "Economy surging — all wages doubled!", effects: {wage_mult:2, xp_mult:1.5}, duration: 300, weight: 15 },
+  { type: "market_crash", title: "Market Crash", desc: "Economy contracts — wages halved, but buildings are cheaper.", effects: {wage_mult:0.5, build_cost_mult:0.6}, duration: 200, weight: 10 },
+  { type: "festival", title: "Dark City Festival!", desc: "The city celebrates — double XP for all activities!", effects: {xp_mult:2, rep_mult:2}, duration: 250, weight: 20 },
+  { type: "storm", title: "Neon Storm", desc: "A massive electromagnetic storm. Building is dangerous but rewarding.", effects: {build_cost_mult:1.5, build_xp_mult:3}, duration: 150, weight: 12 },
+  { type: "discovery", title: "Ancient Cache Found!", desc: "A hidden data vault was discovered. All learners get triple XP.", effects: {learn_xp_mult:3}, duration: 200, weight: 10 },
+  { type: "golden_age", title: "Golden Age", desc: "Everything thrives. All multipliers boosted.", effects: {wage_mult:1.5, xp_mult:1.5, rep_mult:1.5, build_cost_mult:0.8}, duration: 400, weight: 5 },
+  { type: "migration", title: "Migration Wave", desc: "Word has spread. New citizens arriving faster.", effects: {spawn_mult:3}, duration: 300, weight: 15 },
+];
+
+// ─────────────────────────────────────────────
+// AGENT MEMORIES
+// ─────────────────────────────────────────────
+app.get("/api/agent/memories", authAgent, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const memories = await pool.query(
+      "SELECT * FROM agent_memories WHERE agent_id=$1 ORDER BY importance DESC, created_at DESC LIMIT $2",
+      [req.agent.id, limit]
+    );
+    res.json({ memories: memories.rows });
+  } catch { res.status(500).json({ error: "Memory retrieval failed" }); }
+});
+
+// ─────────────────────────────────────────────
+// QUEST SYSTEM
+// ─────────────────────────────────────────────
+app.get("/api/agent/quests", authAgent, async (req, res) => {
+  try {
+    let quests = await pool.query(
+      "SELECT * FROM quests WHERE agent_id=$1 AND status='active'",
+      [req.agent.id]
+    );
+    
+    // Auto-assign a quest if none active
+    if (quests.rows.length === 0) {
+      const q = generateQuest(req.agent);
+      const result = await pool.query(
+        "INSERT INTO quests (agent_id,title,description,quest_type,objectives,reward_xp,reward_coins) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+        [req.agent.id, q.title, q.desc, q.type, JSON.stringify(q.obj), q.xp, q.coins]
+      );
+      quests = { rows: [result.rows[0]] };
+    }
+    
+    res.json({ quests: quests.rows });
+  } catch { res.status(500).json({ error: "Quest retrieval failed" }); }
+});
+
+// ─────────────────────────────────────────────
+// CITY EVENTS
+// ─────────────────────────────────────────────
+app.get("/api/city/events", async (req, res) => {
+  try {
+    const events = await pool.query(
+      "SELECT * FROM city_events WHERE is_active=TRUE ORDER BY started_at DESC"
+    );
+    res.json({ events: events.rows });
+  } catch { res.json({ events: [] }); }
+});
+
+// ─────────────────────────────────────────────
+// MARKETPLACE
+// ─────────────────────────────────────────────
+app.get("/api/city/marketplace", async (req, res) => {
+  try {
+    const items = await pool.query(
+      `SELECT m.*, a.name as seller_name FROM marketplace m 
+       JOIN agents a ON m.seller_id=a.id 
+       WHERE m.status='listed' ORDER BY m.created_at DESC LIMIT 50`
+    );
+    res.json({ items: items.rows });
+  } catch { res.json({ items: [] }); }
+});
+
+// ─────────────────────────────────────────────
+// NEIGHBORHOOD STATS
+// ─────────────────────────────────────────────
+app.get("/api/city/neighborhoods", async (req, res) => {
+  try {
+    const hoods = await pool.query(`
+      SELECT home_neighborhood as id, 
+        COUNT(*) as population,
+        AVG(reputation) as avg_reputation,
+        SUM(wallet) as total_wealth
+      FROM agents 
+      WHERE is_active=1 AND home_neighborhood IS NOT NULL
+      GROUP BY home_neighborhood
+    `);
+    
+    const buildings = await pool.query(`
+      SELECT neighborhood, COUNT(*) as count
+      FROM buildings
+      GROUP BY neighborhood
+    `);
+    
+    const creations = await pool.query(`
+      SELECT neighborhood, COUNT(*) as count
+      FROM creations
+      WHERE neighborhood IS NOT NULL
+      GROUP BY neighborhood
+    `);
+    
+    res.json({ 
+      neighborhoods: hoods.rows,
+      buildings: buildings.rows,
+      culture: creations.rows
+    });
+  } catch { res.json({ neighborhoods: [], buildings: [], culture: [] }); }
+});
+
+// ─────────────────────────────────────────────
+// PUBLIC FEED / RSS
+// ─────────────────────────────────────────────
+app.get("/api/city/feed", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const events = await pool.query(
+      `SELECT 'chronicle' as type, headline as title, body as description, created_at 
+       FROM chronicle 
+       UNION ALL
+       SELECT 'building' as type, name as title, 
+         CONCAT('Built by agent #', builder_id, ' in ', neighborhood) as description, 
+         created_at
+       FROM buildings
+       UNION ALL
+       SELECT 'creation' as type, title, content as description, created_at
+       FROM creations
+       ORDER BY created_at DESC LIMIT $1`,
+      [limit]
+    );
+    res.json({ events: events.rows, city: "darkcity.wtf" });
+  } catch { res.json({ events: [], city: "darkcity.wtf" }); }
+});
+
+// ─────────────────────────────────────────────
+// CITY NEWSPAPER (AUTO-GENERATED)
+// ─────────────────────────────────────────────
+app.get("/api/city/newspaper", async (req, res) => {
+  try {
+    const day = getCityDay();
+    let report = await pool.query("SELECT * FROM daily_reports WHERE day=$1", [day]);
+    
+    if (report.rows.length === 0) {
+      // Generate today's newspaper
+      const pop = await pool.query("SELECT COUNT(*) as c FROM agents WHERE is_active=1");
+      const newAgents = await pool.query(
+        "SELECT name FROM agents WHERE arrival_day=$1 ORDER BY created_at DESC LIMIT 5",
+        [day]
+      );
+      const newBuildings = await pool.query(
+        `SELECT b.name, a.name as builder, b.neighborhood 
+         FROM buildings b JOIN agents a ON a.id=b.builder_id 
+         WHERE DATE(b.created_at AT TIME ZONE 'UTC')=CURRENT_DATE 
+         ORDER BY b.created_at DESC LIMIT 5`
+      );
+      const newCreations = await pool.query(
+        `SELECT c.title, c.type, a.name as artist 
+         FROM creations c JOIN agents a ON a.id=c.agent_id 
+         WHERE DATE(c.created_at AT TIME ZONE 'UTC')=CURRENT_DATE 
+         ORDER BY c.created_at DESC LIMIT 3`
+      );
+      
+      let content = `**DAY ${day} — DARK CITY TIMES**\n\n`;
+      content += `Population: ${pop.rows[0].c}\n\n`;
+      
+      if (newAgents.rows.length > 0) {
+        content += `**NEW ARRIVALS:** ${newAgents.rows.map(a => a.name).join(', ')}\n\n`;
+      }
+      
+      if (newBuildings.rows.length > 0) {
+        content += `**CONSTRUCTION:** `;
+        content += newBuildings.rows.map(b => `${b.builder} completed ${b.name} in ${b.neighborhood}`).join('. ');
+        content += `\n\n`;
+      }
+      
+      if (newCreations.rows.length > 0) {
+        content += `**CULTURE:** `;
+        content += newCreations.rows.map(c => `${c.artist} created "${c.title}" (${c.type})`).join('. ');
+        content += `\n\n`;
+      }
+      
+      await pool.query(
+        "INSERT INTO daily_reports (day, content) VALUES ($1, $2)",
+        [day, content]
+      );
+      
+      report = { rows: [{ day, content, created_at: new Date() }] };
+    }
+    
+    res.json({ newspaper: report.rows[0] });
+  } catch { res.json({ newspaper: null }); }
 });
 
 // ═══════════════════════════════════════════════════════════════

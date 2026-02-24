@@ -2,7 +2,7 @@ services:
   - type: web
     name: darkcity-backend
     runtime: node
-    buildCommand: npm install --production
+    buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
