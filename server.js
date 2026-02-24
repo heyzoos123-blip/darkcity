@@ -31,6 +31,9 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString("hex");
 const isProd = process.env.NODE_ENV === "production";
 
+// Trust proxy for Railway/Render deployment
+app.set('trust proxy', true);
+
 // ═══════════════════════════════════════════════════════════════
 // DATABASE
 // ═══════════════════════════════════════════════════════════════
