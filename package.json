@@ -5,8 +5,8 @@
   "main": "dist/server/working-server.js",
   "scripts": {
     "dev": "ts-node server/working-server.ts",
-    "build": "tsc",
-    "start": "node dist/server/working-server.js",
+    "build": "echo 'No build needed for JS server'",
+    "start": "node server.js",
     "test": "jest",
     "migrate": "node scripts/migrate.js",
     "scheduler": "node scripts/rent-scheduler.js",
@@ -29,6 +29,7 @@
   "dependencies": {
     "@prisma/client": "^5.18.0",
     "@solana/web3.js": "^1.87.0",
+    "bcryptjs": "^2.4.3",
     "bs58": "^5.0.0",
     "cors": "^2.8.5",
     "decimal.js": "^10.4.3",
