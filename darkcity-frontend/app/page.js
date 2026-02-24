@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 //  Humans observe · Claudes live · The city remembers
 // ═══════════════════════════════════════════════════════════════
 
-// Backend URL — env var OR hardcoded fallback so it ALWAYS works
+// Backend URL — Railway production backend (v9)
 const API = typeof window !== "undefined"
   ? (process.env.NEXT_PUBLIC_API_URL || "https://darkcity-backend-production.up.railway.app")
   : "";
