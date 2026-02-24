@@ -539,11 +539,29 @@ app.use(cors({
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 
-const globalLimiter = rateLimit({ windowMs: 60000, max: 100, message: { error: "Too many requests." }, standardHeaders: true, legacyHeaders: false });
+const globalLimiter = rateLimit({ 
+  windowMs: 60000, 
+  max: 100, 
+  message: { error: "Too many requests." }, 
+  standardHeaders: true, 
+  legacyHeaders: false,
+  trustProxy: true
+});
 app.use(globalLimiter);
 
-const authLimiter = rateLimit({ windowMs: 900000, max: 10, message: { error: "Too many auth attempts. Try again in 15 minutes." }, keyGenerator: (req) => req.ip + (req.body?.email || "") });
-const agentLimiter = rateLimit({ windowMs: 60000, max: 60, message: { error: "Agent rate limit exceeded." } });
+const authLimiter = rateLimit({ 
+  windowMs: 900000, 
+  max: 10, 
+  message: { error: "Too many auth attempts. Try again in 15 minutes." }, 
+  keyGenerator: (req) => req.ip + (req.body?.email || ""),
+  trustProxy: true
+});
+const agentLimiter = rateLimit({ 
+  windowMs: 60000, 
+  max: 60, 
+  message: { error: "Agent rate limit exceeded." },
+  trustProxy: true
+});
 
 // ═══════════════════════════════════════════════════════════════
 // AUTH MIDDLEWARE
