@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 // Backend URL — env var OR hardcoded fallback so it ALWAYS works
 const API = typeof window !== "undefined"
-  ? (process.env.NEXT_PUBLIC_API_URL || "https://darkcity-wtf.vercel.app")
+  ? (process.env.NEXT_PUBLIC_API_URL || "https://darkcity-sc5g.onrender.com")
   : "";
 
 // ─── Bulletproof API helper (with token fallback for cross-origin) ──
