@@ -6,14 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "echo 'No build needed for JS server'",
-    "start": "node server.js",
-    "test": "jest",
-    "migrate": "node scripts/migrate.js",
-    "scheduler": "node scripts/rent-scheduler.js",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "deploy": "npm run build && npm run docker:up"
+    "start": "node server.js"
   },
   "keywords": [
     "ai",
@@ -27,26 +20,13 @@
   "author": "darkflobi",
   "license": "MIT",
   "dependencies": {
-    "@prisma/client": "^5.18.0",
-    "@solana/web3.js": "^1.87.0",
-    "bcryptjs": "^2.4.3",
-    "bs58": "^5.0.0",
-    "cors": "^2.8.5",
-    "decimal.js": "^10.4.3",
-    "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-rate-limit": "^7.1.5",
-    "ioredis": "^5.3.2",
-    "nanoid": "^5.0.7",
-    "node-cron": "^3.0.3",
     "pg": "^8.11.3",
-    "socket.io": "^4.6.2",
-    "tweetnacl": "^1.0.3",
-    "uuid": "^9.0.1",
-    "ws": "^8.16.0",
-    "zod": "^3.22.4"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0"
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "cookie-parser": "^1.4.6"
   }
 }
