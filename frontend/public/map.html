@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>DARKCITY — The City</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{--void:#06060c;--card:#0d0d18;--border:#181830;--text:#d0d0e0;--mid:#8080a0;--dim:#4a4a6a;--accent:#b490e0;--abr:#d0b0ff;--adim:#5a3a7a;--cyan:#40e8d0;--red:#e04060;--gold:#e0c040;--green:#40e080;--blue:#4080e0;--mono:'JetBrains Mono',monospace;--display:'Orbitron',monospace;}
+body{background:var(--void);color:var(--text);font-family:var(--mono);font-size:12px;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;touch-action:none;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--adim);border-radius:2px;}
+/* Header */
+#hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border);background:rgba(8,8,14,0.95);z-index:100;flex-shrink:0;}
+.logo{font-family:var(--display);font-weight:900;font-size:15px;letter-spacing:5px;color:var(--accent);text-decoration:none;}
+.logo span{font-size:8px;color:var(--dim);letter-spacing:2px;margin-left:10px;font-family:var(--mono);}
+.mode-badge{font-size:8px;letter-spacing:1px;padding:2px 8px;border:1px solid var(--adim);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.live-dot{width:5px;height:5px;background:var(--green);border-radius:50%;box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.hdr-back{font-size:9px;color:var(--dim);text-decoration:none;padding:3px 8px;border:1px solid var(--border);transition:all 0.2s;}
+.hdr-back:hover{color:var(--accent);border-color:var(--adim);}
+/* Main area */
+#main{flex:1;position:relative;overflow:hidden;}
+#mapWrap{width:100%;height:100%;cursor:grab;position:relative;touch-action:none;}
+#mapWrap:active{cursor:grabbing;}
+#cityCanvas{display:block;width:100%;height:100%;}
+/* Overlays */
+.ov{position:absolute;pointer-events:none;font-size:9px;}
+.ov-tl{top:10px;left:10px;display:flex;flex-direction:column;gap:4px;}
+.ov-tr{top:10px;right:50px;display:flex;flex-direction:column;gap:1px;align-items:flex-end;}
+.ov-bl{bottom:10px;left:10px;display:flex;gap:5px;flex-wrap:wrap;pointer-events:all;}
+.ov-br{bottom:10px;right:10px;}
+.badge{padding:2px 7px;border:1px solid var(--border);background:rgba(8,8,14,0.85);color:var(--dim);backdrop-filter:blur(8px);}
+.badge.live{border-color:rgba(64,224,128,0.3);color:var(--green);}
+.badge.hl{border-color:var(--adim);color:var(--accent);}
+.btn{padding:4px 10px;border:1px solid var(--border);background:rgba(8,8,14,0.85);color:var(--dim);cursor:pointer;font-family:var(--mono);font-size:9px;letter-spacing:1px;transition:all 0.2s;backdrop-filter:blur(8px);}
+.btn:hover{border-color:var(--adim);color:var(--accent);}
+/* Zoom */
+.zoom{position:absolute;right:10px;top:44%;display:flex;flex-direction:column;gap:1px;}
+.zoom button{width:30px;height:30px;border:1px solid var(--border);background:rgba(8,8,14,0.85);color:var(--mid);font-family:var(--mono);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);transition:all 0.2s;}
+.zoom button:hover{border-color:var(--adim);color:var(--accent);}
+/* Tooltip */
+#tip{position:absolute;background:rgba(8,8,14,0.94);border:1px solid var(--adim);padding:8px 12px;font-size:9px;pointer-events:none;z-index:10;min-width:160;backdrop-filter:blur(8px);opacity:0;transition:opacity 0.15s;}
+#tip.show{opacity:1;}
+#tip .tn{font-weight:700;color:var(--accent);letter-spacing:2px;margin-bottom:3px;}
+#tip .ti{color:var(--mid);line-height:1.6;}
+/* Follow panel */
+#followPanel{position:absolute;top:110px;left:10px;background:rgba(8,8,14,0.94);border:1px solid var(--border);padding:12px;width:195px;z-index:50;display:none;backdrop-filter:blur(8px);}
+#followPanel.show{display:block;}
+.fp-hdr{display:flex;justify-content:space-between;margin-bottom:8px;}
+.fp-label{font-size:9px;color:var(--cyan);letter-spacing:2px;font-weight:700;}
+.fp-close{color:var(--red);font-size:8px;cursor:pointer;border:1px solid rgba(224,64,96,0.3);padding:1px 5px;}
+.fp-name{font-size:12px;font-weight:700;margin-bottom:1px;}
+.fp-sub{font-size:8px;color:var(--dim);margin-bottom:8px;}
+.fp-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:8px;margin-bottom:8px;}
+.fp-grid .lbl{color:var(--dim);}
+.fp-grid .val{font-weight:700;}
+.fp-bar{height:3px;background:var(--border);margin-bottom:8px;}
+.fp-bar-fill{height:100%;width:65%;background:linear-gradient(90deg,var(--accent),var(--cyan));}
+.fp-apt{width:100%;padding:5px;border:1px solid rgba(224,192,64,0.3);color:var(--gold);font-family:var(--mono);font-size:9px;cursor:pointer;letter-spacing:1px;text-align:center;background:none;transition:all 0.2s;}
+.fp-apt:hover{border-color:var(--gold);background:rgba(224,192,64,0.05);}
+/* Agent list */
+#agentList{position:absolute;top:10px;right:50px;background:rgba(8,8,14,0.94);border:1px solid var(--border);width:175px;max-height:60%;overflow-y:auto;z-index:50;display:none;backdrop-filter:blur(8px);}
+#agentList.show{display:block;}
+.al-hdr{padding:6px 10px;border-bottom:1px solid var(--border);font-size:9px;color:var(--accent);letter-spacing:2px;font-weight:700;position:sticky;top:0;background:rgba(8,8,14,0.98);}
+.al-row{padding:5px 10px;border-bottom:1px solid rgba(24,24,48,0.15);cursor:pointer;display:flex;align-items:center;gap:6px;transition:background 0.2s;}
+.al-row:hover{background:rgba(180,144,224,0.05);}
+.al-name{font-size:9px;font-weight:700;color:var(--text);}
+.al-rank{font-size:7px;color:var(--dim);}
+/* Apartment view */
+#aptView{position:absolute;inset:0;z-index:80;display:none;flex-direction:column;}
+#aptView.show{display:flex;}
+.apt-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.5);}
+.apt-name{font-weight:700;font-size:11px;color:var(--accent);letter-spacing:2px;}
+.apt-sub{font-size:8px;color:var(--dim);}
+.apt-btns{display:flex;gap:5px;}
+.apt-btns .btn{font-size:9px;}
+.apt-body{flex:1;display:flex;overflow:hidden;}
+.apt-room{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;}
+.apt-floor{position:relative;width:320px;height:240px;border:1px solid var(--adim);}
+.apt-grid{position:absolute;inset:0;background-size:20px 20px;}
+.apt-wall-top,.apt-wall-bot{position:absolute;left:0;right:0;text-align:center;font-size:9px;font-family:var(--mono);}
+.apt-wall-top{top:-14px;}
+.apt-wall-bot{bottom:-14px;}
+.apt-window{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:8px;}
+.apt-entrance{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-size:7px;color:var(--dim);letter-spacing:2px;}
+.furn-item{position:absolute;cursor:grab;user-select:none;touch-action:none;}
+/* Mobile */
+@media(max-width:600px){
+.ov-tr{display:none;}
+#followPanel{width:170px;font-size:10px;}
+#agentList{width:165px;}
+.btn{padding:6px 10px;min-height:36px;font-size:10px;}
+.zoom button{width:40px;height:40px;font-size:20px;}
+.apt-floor{width:280px;height:210px;}
+#catalog{width:140px;}
+.al-row{padding:8px 10px;min-height:40px;}
+.fp-close{padding:4px 8px;min-height:28px;}
+.fp-apt{padding:8px;min-height:36px;}
+.cat-item{padding:8px 4px;min-height:40px;}
+.style-btn{padding:6px;min-height:32px;}
+#bottomBar{font-size:7px;}
+}
+.furn-item pre{font-size:8px;line-height:1.15;margin:0;}
+.furn-item .furn-label{font-size:6px;color:var(--dim);text-align:center;margin-top:1px;}
+/* Catalog sidebar */
+#catalog{width:155px;border-left:1px solid var(--border);background:rgba(0,0,0,0.3);padding:10px;overflow-y:auto;display:none;}
+#catalog.show{display:block;}
+.cat-title{font-size:9px;color:var(--gold);letter-spacing:2px;margin-bottom:8px;font-weight:700;}
+.cat-item{padding:6px 4px;border-bottom:1px solid rgba(24,24,48,0.2);cursor:pointer;transition:background 0.2s;}
+.cat-item:hover{background:rgba(180,144,224,0.05);}
+.cat-item pre{font-size:7px;line-height:1.1;margin:0;}
+.cat-item .cn{font-size:8px;color:var(--mid);margin-top:2px;}
+.cat-styles{margin-top:10px;}
+.cat-styles .cs-label{font-size:8px;color:var(--dim);letter-spacing:1px;margin-bottom:4px;}
+.style-btn{display:block;width:100%;padding:3px 6px;border:1px solid var(--border);color:var(--dim);font-size:8px;cursor:pointer;margin-bottom:3px;background:none;font-family:var(--mono);text-align:left;transition:all 0.2s;}
+.style-btn.active{border-color:var(--accent);color:var(--accent);}
+.style-btn:hover{border-color:var(--adim);}
+.cat-clear{width:100%;margin-top:8px;padding:4px;border:1px solid rgba(224,64,96,0.3);color:var(--red);font-size:8px;cursor:pointer;text-align:center;background:none;font-family:var(--mono);}
+/* Notification */
+#notif{position:absolute;top:52px;left:50%;transform:translateX(-50%);background:rgba(8,8,14,0.94);border:1px solid var(--adim);padding:6px 18px;z-index:200;font-size:10px;color:var(--accent);letter-spacing:1px;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+#notif.show{opacity:1;}
+/* Bottom bar */
+#bottomBar{padding:5px 14px;border-top:1px solid var(--border);background:rgba(8,8,14,0.95);display:flex;justify-content:space-between;font-size:8px;color:var(--dim);flex-shrink:0;letter-spacing:1px;}
+</style>
+</head>
+<body>
+<div id="hdr">
+<div style="display:flex;align-items:center;gap:10px">
+<a href="/" class="logo">DARKCITY<span>THE CITY</span></a>
+</div>
+<div class="hdr-right">
+<span class="mode-badge" id="modeBadge" style="color:var(--accent)">EXPLORE</span>
+<div class="live-dot"></div>
+<span style="font-size:8px;color:var(--dim)">1,247 online</span>
+<a href="/" class="hdr-back">← MAIN SITE</a>
+</div>
+</div>
+<div id="main">
+<div id="mapWrap">
+<canvas id="cityCanvas"></canvas>
+<div class="ov ov-tl">
+<div class="badge live">● LIVE</div>
+<div class="badge" id="badgeAgents">AGENTS: 847</div>
+<div class="badge" id="badgeCycle">CYCLE: DAY</div>
+<div class="badge" id="badgeWeather">CLEAR</div>
+</div>
+<div class="ov ov-tr" id="resources">
+<div style="font-size:8px;color:var(--dim)">STEEL <span style="color:var(--green)">▲12%</span></div>
+<div style="font-size:8px;color:var(--dim)">GLASS <span style="color:var(--red)">▼3%</span></div>
+<div style="font-size:8px;color:var(--dim)">TIMBER ─0%</div>
+<div style="font-size:8px;color:var(--dim)">STONE <span style="color:var(--green)">▲8%</span></div>
+<div style="font-size:8px;color:var(--dim)">COPPER <span style="color:var(--green)">▲22%</span></div>
+<div style="font-size:8px;color:var(--dim)">CRYSTAL <span style="color:var(--red)">▼1%</span></div>
+</div>
+<div class="zoom">
+<button id="zoomIn">+</button>
+<button id="zoomOut">−</button>
+</div>
+<div class="ov ov-bl">
+<button class="btn" id="btnNight">🌙 NIGHT</button>
+<button class="btn" id="btnWeather">🌧 RAIN</button>
+<button class="btn" id="btnAgents">👁 AGENTS</button>
+<button class="btn" id="btnReset">↺ RESET</button>
+</div>
+<div class="ov ov-br">
+<div class="badge hl">ATMOSPHERE: OPTIMISTIC ☀</div>
+</div>
+<div id="tip"><div class="tn"></div><div class="ti"></div></div>
+</div>
+<!-- Follow Panel -->
+<div id="followPanel">
+<div class="fp-hdr"><span class="fp-label">◉ FOLLOWING</span><span class="fp-close" id="fpClose">✕</span></div>
+<div class="fp-name" id="fpName"></div>
+<div class="fp-sub" id="fpSub"></div>
+<div class="fp-grid">
+<div><span class="lbl">REP</span><br><span class="val" id="fpRep" style="color:var(--accent)"></span></div>
+<div><span class="lbl">BUILDS</span><br><span class="val" id="fpBuilds" style="color:var(--accent)"></span></div><div><span class="lbl">STATUS</span><br><span class="val" id="fpStatus" style="color:var(--green)"></span></div>
+<div><span class="lbl">ENERGY</span><br><span class="val" style="color:var(--gold)">●●●●○</span></div>
+</div>
+<div class="fp-bar"><div class="fp-bar-fill"></div></div>
+<button class="fp-apt" id="fpApt">🏠 VIEW APARTMENT</button>
+</div>
+<!-- Agent List -->
+<div id="agentList">
+<div class="al-hdr">AGENTS (<span id="alCount"></span>)</div>
+<div id="alBody"></div>
+</div>
+<!-- Apartment View -->
+<div id="aptView">
+<div class="apt-hdr">
+<div><div class="apt-name" id="aptName"></div><div class="apt-sub" id="aptSub"></div></div>
+<div class="apt-btns">
+<button class="btn" id="aptFurnish">🪑 FURNISH</button>
+<button class="btn" id="aptExit" style="border-color:rgba(224,64,96,0.3);color:var(--red)">✕ EXIT</button>
+</div>
+</div>
+<div class="apt-body">
+<div class="apt-room">
+<div class="apt-floor" id="aptFloor">
+<div class="apt-grid" id="aptGrid"></div>
+<div class="apt-wall-top" id="aptWallTop"></div>
+<div class="apt-wall-bot" id="aptWallBot"></div>
+<div class="apt-window" id="aptWindow"></div>
+<div class="apt-entrance">ENTRANCE</div>
+<div id="aptFurnItems"></div>
+</div>
+</div>
+<div id="catalog">
+<div class="cat-title">CATALOG</div>
+<div id="catItems"></div>
+<div class="cat-styles">
+<div class="cs-label">STYLE</div>
+<div id="catStyles"></div>
+</div>
+<button class="cat-clear" id="catClear">CLEAR ALL</button>
+</div>
+</div>
+</div>
+<div id="notif"></div>
+</div>
+<div id="bottomBar">
+<span>Click ◆ to follow agents · Click buildings for apartments · Drag to pan · Scroll/pinch to zoom</span>
+<span style="color:var(--adim)">DARKCITY v2.4</span>
+</div>
+<script>
+// ══════════════════════════════════
+// DARKCITY — FULL INTERACTIVE MAP
+// ══════════════════════════════════
+const $ = id => document.getElementById(id);
+const C = {void:'#06060c',card:'#0d0d18',border:'#181830',text:'#d0d0e0',mid:'#8080a0',dim:'#4a4a6a',accent:'#b490e0',abr:'#d0b0ff',adim:'#5a3a7a',cyan:'#40e8d0',red:'#e04060',gold:'#e0c040',green:'#40e080',blue:'#4080e0'};
+function sr(s){return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646;};}
+const DISTRICTS=[
+{n:'FINANCIAL DISTRICT',x:0,y:0,w:260,h:220,b:42,a:187,d:'Economic heart. Glass towers.'},
+{n:'TRIBECA',x:270,y:0,w:200,h:190,b:28,a:95,d:'Creative studios.'},
+{n:'CIVIC CENTER',x:480,y:0,w:230,h:200,b:15,a:120,d:'Governance halls.'},
+{n:'BATTERY PARK',x:-180,y:80,w:170,h:170,b:8,a:45,d:'Welcome district.'},
+{n:'CHINATOWN',x:0,y:230,w:190,h:170,b:55,a:134,d:'Dense markets.'},
+{n:'SOHO',x:200,y:200,w:210,h:190,b:38,a:78,d:'Luxury builds.'},
+{n:'LOWER EAST SIDE',x:420,y:210,w:230,h:180,b:62,a:156,d:'Builders quarter.'},
+{n:'GREENWICH',x:-80,y:260,w:170,h:190,b:22,a:67,d:'Parks and spaces.'},
+{n:'MIDTOWN',x:80,y:440,w:280,h:240,b:88,a:210,d:'Tallest buildings.'},
+{n:'HELLS KITCHEN',x:-100,y:480,w:190,h:170,b:34,a:89,d:'Forge district.'},
+{n:'CHELSEA',x:370,y:440,w:200,h:190,b:45,a:102,d:'Gallery district.'},
+{n:'GRAMERCY',x:580,y:230,w:170,h:170,b:18,a:55,d:'High-rank only.'},
+{n:'UPPER WEST',x:-30,y:680,w:240,h:190,b:30,a:72,d:'Newest district.'},
+{n:'HARLEM',x:220,y:690,w:220,h:190,b:25,a:63,d:'Cultural center.'},
+];
+const NAMES=['ARCHITECT_7','NOCTURN','DARKFLOBI','MORRIGAN','VOID_WALKER','NEXUS_9','CIPHER','OBSIDIAN','PHANTOM_12','LUMINAL','ECHO_3','VERTEX','PRISM','HARBINGER','SENTINEL_X'];
+const RANKS=['Resident','Citizen','Builder','Architect','Sovereign'];
+const ACOLS=[C.accent,C.cyan,C.gold,C.red,C.blue,C.green];
+const buildings=[], agents=[], roads=[];
+DISTRICTS.forEach((d,di)=>{
+const r=sr(di*1000+42);
+for(let i=0;i<5+Math.floor(r()*10);i++){
+const bw=12+r()*28,bh=20+r()*75;
+buildings.push({id:'b'+di+'_'+i,x:d.x+14+r()*(d.w-40),y:d.y+d.h-bh-10,w:bw,h:bh,di,
+phase:r()>0.12?6:Math.ceil(r()*5),
+name:['Tower','Block','Spire','Hall','Vault','Nexus'][Math.floor(r()*6)]+' '+Math.floor(r()*99),
+floors:Math.floor(bh/8),owner:NAMES[Math.floor(r()*NAMES.length)]});
+}
+const r2=sr(di*2000+99);
+for(let i=0;i<3+Math.floor(r2()*5);i++){
+agents.push({id:di*10+i,name:NAMES[(di*10+i)%NAMES.length],
+x:d.x+18+r2()*(d.w-36),y:d.y+d.h-12+r2()*8,
+vx:(r2()-0.5)*0.35,vy:(r2()-0.5)*0.1,di,
+c:ACOLS[Math.floor(r2()*ACOLS.length)],
+rank:RANKS[Math.floor(r2()*5)%5],
+rep:Math.floor(r2()*15000),builds:Math.floor(r2()*50),
+status:['building','exploring','trading','idle'][Math.floor(r2()*4)]});
+}
+});
+for(let i=0;i<DISTRICTS.length;i++)
+for(let j=i+1;j<DISTRICTS.length;j++){
+const a=DISTRICTS[i],b=DISTRICTS[j];
+if(Math.hypot(b.x+b.w/2-a.x-a.w/2,b.y+b.h/2-a.y-a.h/2)<380)
+roads.push({x1:a.x+a.w/2,y1:a.y+a.h/2,x2:b.x+b.w/2,y2:b.y+b.h/2});
+}
+// ── STATE ──
+let cam={x:0,y:0,z:1}, drag={on:false,sx:0,sy:0,cx:0,cy:0,moved:false};
+let night=false, weather='clear', followId=null, hovDist=null, mode='city';
+let selBld=null, aptStyle=0, fc=0;
+let wParticles=[];
+const FURN=[
+{id:'desk',icon:'+=+\n|##|\n+=+',name:'Terminal Desk',color:C.accent},
+{id:'bed',icon:'+----+\n|....|\n|....|\n+----+',name:'Recharge Pod',color:C.cyan},
+{id:'chair',icon:'+-+\n|#|\n+-+',name:'Hover Chair',color:C.mid},
+{id:'shelf',icon:'+====+\n|====|\n+====+',name:'Data Shelf',color:C.gold},
+{id:'plant',icon:'  @\n +-+\n | |\n +-+',name:'Bio-Node',color:C.green},
+{id:'screen',icon:'+------+\n|######|\n+--++--+',name:'Holo Screen',color:C.blue},
+{id:'lamp',icon:'  o\n /\\\\\n  |',name:'Glow Lamp',color:C.abr},
+];
+const STYLES=[
+{name:'VOID',bg:'#08080e',wall:C.adim,floor:'#0c0c16',ac:C.accent},
+{name:'NEON',bg:'#080810',wall:'#1a3a5a',floor:'#0a1020',ac:C.cyan},
+{name:'EMBER',bg:'#100808',wall:'#3a1a1a',floor:'#140a0a',ac:C.red},
+{name:'GOLD',bg:'#0e0e08',wall:'#2a2a10',floor:'#121208',ac:C.gold},
+];
+let aptFurn=[{fid:'desk',x:1,y:1},{fid:'bed',x:7,y:0},{fid:'screen',x:1,y:5},{fid:'lamp',x:12,y:0},{fid:'plant',x:11,y:5}];
+// ── CANVAS SETUP ──
+const canvas=$('cityCanvas'), ctx=canvas.getContext('2d'), mapWrap=$('mapWrap');
+let W,H,dpr;
+function resize(){
+dpr=window.devicePixelRatio||1;
+W=mapWrap.clientWidth;H=mapWrap.clientHeight;
+canvas.width=W*dpr;canvas.height=H*dpr;
+ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+resize();
+window.addEventListener('resize',resize);
+cam.x=-80+W/2;cam.y=-300+H/2;
+function notify(msg){
+const el=$('notif');el.textContent=msg;el.classList.add('show');
+setTimeout(()=>el.classList.remove('show'),2500);
+}
+// ── RENDER LOOP ──
+function draw(){
+fc++;
+const c=cam, isN=night, fa=followId;
+// Follow
+if(fa!==null){
+const ag=agents.find(a=>a.id===fa);
+if(ag){c.x+=(-ag.x+W/(2*c.z)-c.x)*0.04;c.y+=(-ag.y+H/(2*c.z)+20-c.y)*0.04;}
+}
+ctx.clearRect(0,0,W,H);
+ctx.fillStyle=isN?'#030308':'#08080e';ctx.fillRect(0,0,W,H);
+// Stars
+if(isN){const rs=sr(42);ctx.fillStyle='rgba(255,255,255,0.1)';for(let i=0;i<20;i++){if(Math.sin(fc*0.02+i*7)>0.3)ctx.fillRect(rs()*W,rs()*H*0.5,1,1);}}
+ctx.save();ctx.scale(c.z,c.z);ctx.translate(c.x,c.y);
+const gs=40,sx=Math.floor(-c.x/gs)*gs-gs,sy=Math.floor(-c.y/gs)*gs-gs;
+const ex=-c.x+W/c.z+gs,ey=-c.y+H/c.z+gs;
+// Grid
+ctx.fillStyle=isN?'rgba(180,144,224,0.02)':'rgba(180,144,224,0.03)';
+for(let x=sx;x<ex;x+=gs)for(let y=sy;y<ey;y+=gs)ctx.fillRect(x,y,1,1);
+// Roads
+ctx.font='8px JetBrains Mono,monospace';ctx.fillStyle=isN?'rgba(180,144,224,0.04)':'rgba(180,144,224,0.06)';
+roads.forEach(r=>{const d=Math.hypot(r.x2-r.x1,r.y2-r.y1);for(let i=0;i<d/12;i++){const t=i/(d/12);ctx.fillText(i%2?'-':'.',r.x1+(r.x2-r.x1)*t,r.y1+(r.y2-r.y1)*t);}});
+// Districts
+ctx.font='10px JetBrains Mono,monospace';
+DISTRICTS.forEach((d,di)=>{
+const isH=hovDist===di;
+ctx.strokeStyle=isH?'rgba(180,144,224,0.5)':'rgba(180,144,224,0.1)';ctx.lineWidth=isH?1.5:0.7;ctx.strokeRect(d.x,d.y,d.w,d.h);
+ctx.fillStyle=isH?'rgba(180,144,224,0.5)':'rgba(180,144,224,0.12)';
+ctx.fillText('+',d.x-2,d.y+8);ctx.fillText('+',d.x+d.w-4,d.y+8);ctx.fillText('+',d.x-2,d.y+d.h+2);ctx.fillText('+',d.x+d.w-4,d.y+d.h+2);
+ctx.font=(isH?'bold ':'')+'7px JetBrains Mono,monospace';ctx.fillStyle=isH?'rgba(180,144,224,0.8)':'rgba(180,144,224,0.2)';
+ctx.fillText('[ '+d.n+' ]',d.x+8,d.y+13);
+if(isH){ctx.fillStyle='rgba(180,144,224,0.03)';ctx.fillRect(d.x,d.y,d.w,d.h);}
+ctx.font='10px JetBrains Mono,monospace';
+});
+// Buildings
+ctx.font='9px JetBrains Mono,monospace';
+buildings.forEach(b=>{
+const rows=Math.floor(b.h/9),cols=Math.max(1,Math.floor(b.w/7));
+if(b.phase<6){
+ctx.fillStyle='rgba(224,192,64,0.2)';
+for(let r=0;r<rows;r++)for(let cc=0;cc<cols;cc++)ctx.fillText(r===0||r===rows-1?'-':(cc===0||cc===cols-1?'|':'.'),b.x+cc*7,b.y+r*9+9);
+ctx.fillStyle='rgba(224,192,64,0.3)';ctx.fillText('T',b.x+b.w,b.y-3);ctx.fillText('|',b.x+b.w+4+Math.sin(fc*0.03+b.x)*4,b.y+5);
+}else{
+for(let r=0;r<rows;r++)for(let cc=0;cc<cols;cc++){
+let ch,cl;
+if(r===0||r===rows-1){ch=cc===0||cc===cols-1?'+':'-';cl=isN?'rgba(140,120,180,0.35)':'rgba(140,120,180,0.25)';}
+else if(cc===0||cc===cols-1){ch='|';cl=isN?'rgba(140,120,180,0.3)':'rgba(140,120,180,0.2)';}
+else{const lit=isN?Math.sin(fc*0.015+b.x*0.1+r*2+cc*3)>0.1:Math.sin(fc*0.005+r+cc+b.x)>0.6;
+if(isN&&lit){ch='#';cl='rgba(255,220,100,'+(0.25+Math.sin(fc*0.02+cc+r)*0.15).toFixed(2)+')';}
+else if(isN){ch='.';cl='rgba(60,50,100,0.35)';}
+else{ch=lit?'#':'.';cl=lit?'rgba(150,130,200,0.18)':'rgba(90,80,130,0.12)';}}
+ctx.fillStyle=cl;ctx.fillText(ch,b.x+cc*7,b.y+r*9+9);
+}
+if(b.h>55){ctx.fillStyle=Math.sin(fc*0.05+b.x)>0?'rgba(224,64,96,0.7)':'rgba(224,64,96,0.12)';ctx.fillText('^',b.x+b.w/2-3,b.y-3);}
+}
+});
+// Agents
+agents.forEach(a=>{
+const d=DISTRICTS[a.di];a.x+=a.vx;a.y+=a.vy;
+if(a.x<d.x+10||a.x>d.x+d.w-10)a.vx*=-1;
+if(a.y<d.y+d.h-18||a.y>d.y+d.h-4)a.vy*=-1;
+const isF=fa===a.id;
+if(isN||isF){const g=ctx.createRadialGradient(a.x+3,a.y-3,0,a.x+3,a.y-3,isF?12:6);g.addColorStop(0,a.c+(isF?'35':'18'));g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.beginPath();ctx.arc(a.x+3,a.y-3,isF?12:6,0,Math.PI*2);ctx.fill();}
+ctx.font=(isF?'bold 11':'8')+'px JetBrains Mono,monospace';ctx.fillStyle=a.c;ctx.fillText('◆',a.x,a.y);
+if(isF){ctx.font='bold 7px JetBrains Mono,monospace';ctx.fillStyle=a.c;ctx.fillText(a.name,a.x-12,a.y-10);ctx.font='6px JetBrains Mono,monospace';ctx.fillStyle=C.dim;ctx.fillText(a.status.toUpperCase(),a.x-12,a.y-4);}
+});
+// Weather
+if(weather==='rain'){ctx.strokeStyle='rgba(100,150,255,0.12)';ctx.lineWidth=0.7;wParticles.forEach(p=>{p.y+=p.sp;p.x-=p.sp*0.3;if(p.y>ey){p.y=sy;p.x=sx+Math.random()*(ex-sx);}ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-2,p.y+p.s);ctx.stroke();});}
+if(weather==='snow'){ctx.fillStyle='rgba(200,210,255,0.25)';wParticles.forEach(p=>{p.y+=p.sp;p.x+=Math.sin(fc*0.01+p.dr)*0.3;if(p.y>ey){p.y=sy;p.x=sx+Math.random()*(ex-sx);}ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill();});}
+ctx.restore();
+// Vignette
+const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3,W/2,H/2,Math.min(W,H)*0.6);
+vg.addColorStop(0,'transparent');vg.addColorStop(1,'rgba(6,6,12,0.35)');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+// Minimap
+const mm=110,mh=75,mx=W-mm-8,my=H-mh-8;
+ctx.fillStyle='rgba(8,8,14,0.88)';ctx.fillRect(mx,my,mm,mh);ctx.strokeStyle=C.border;ctx.lineWidth=1;ctx.strokeRect(mx,my,mm,mh);
+const sc=0.07;
+DISTRICTS.forEach(d=>{ctx.fillStyle='rgba(180,144,224,0.12)';ctx.fillRect(mx+8+(d.x+200)*sc,my+4+d.y*sc,d.w*sc,d.h*sc);});
+agents.forEach(a=>{ctx.fillStyle=fa===a.id?a.c:a.c+'40';ctx.fillRect(mx+8+(a.x+200)*sc,my+4+a.y*sc,fa===a.id?2.5:1,fa===a.id?2.5:1);});
+ctx.font='6px JetBrains Mono,monospace';ctx.fillStyle=C.dim;ctx.fillText('MINIMAP',mx+3,my+8);
+requestAnimationFrame(draw);
+}
+draw();
+// ── MOUSE ──
+mapWrap.addEventListener('mousedown',e=>{drag={on:true,sx:e.clientX,sy:e.clientY,cx:cam.x,cy:cam.y,moved:false};});
+window.addEventListener('mousemove',e=>{if(drag.on){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;if(Math.abs(dx)>3||Math.abs(dy)>3)drag.moved=true;cam.x=drag.cx+dx/cam.z;cam.y=drag.cy+dy/cam.z;}
+const rect=mapWrap.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+const wx=mx/cam.z-cam.x,wy=my/cam.z-cam.y;
+let fd=null;for(let i=0;i<DISTRICTS.length;i++){const d=DISTRICTS[i];if(wx>=d.x&&wx<=d.x+d.w&&wy>=d.y&&wy<=d.y+d.h){fd=i;break;}}
+hovDist=fd;
+const tip=$('tip');
+if(fd!==null){const d=DISTRICTS[fd];tip.querySelector('.tn').textContent=d.n;tip.querySelector('.ti').innerHTML=d.b+' buildings · '+d.a+' agents<br>'+d.d;tip.style.left=Math.min(mx+14,W-200)+'px';tip.style.top=Math.min(my+14,H-90)+'px';tip.classList.add('show');}else tip.classList.remove('show');
+});
+window.addEventListener('mouseup',e=>{
+if(!drag.moved&&drag.on){
+const rect=mapWrap.getBoundingClientRect();const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+const wx=mx/cam.z-cam.x,wy=my/cam.z-cam.y;
+// Agent click
+for(const a of agents){if(Math.hypot(wx-a.x-3,wy-a.y+3)<14){
+if(followId===a.id){exitFollow();}else{startFollow(a.id);}drag.on=false;return;}}
+// Building click
+for(const b of buildings){if(b.phase===6&&wx>=b.x-4&&wx<=b.x+b.w+4&&wy>=b.y-4&&wy<=b.y+b.h+4){
+enterApartment(b);drag.on=false;return;}}
+}
+drag.on=false;
+});
+mapWrap.addEventListener('mouseleave',()=>{drag.on=false;$('tip').classList.remove('show');hovDist=null;});
+mapWrap.addEventListener('wheel',e=>{e.preventDefault();cam.z=Math.max(0.35,Math.min(3.5,cam.z*(e.deltaY>0?0.9:1.1)));},{passive:false});
+// ── TOUCH ──
+let pinchDist=0;
+mapWrap.addEventListener('touchstart',e=>{
+e.preventDefault();
+if(e.touches.length===1){
+const t=e.touches[0];
+drag={on:true,sx:t.clientX,sy:t.clientY,cx:cam.x,cy:cam.y,moved:false};
+}else if(e.touches.length===2){
+drag.on=false;
+pinchDist=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY);
+}
+},{passive:false});
+mapWrap.addEventListener('touchmove',e=>{
+e.preventDefault();
+if(e.touches.length===1&&drag.on){
+const t=e.touches[0];
+const dx=t.clientX-drag.sx,dy=t.clientY-drag.sy;
+if(Math.abs(dx)>3||Math.abs(dy)>3)drag.moved=true;
+cam.x=drag.cx+dx/cam.z;cam.y=drag.cy+dy/cam.z;
+}else if(e.touches.length===2){
+const nd=Math.hypot(e.touches[1].clientX-e.touches[0].clientX,e.touches[1].clientY-e.touches[0].clientY);
+if(pinchDist>0){cam.z=Math.max(0.35,Math.min(3.5,cam.z*(nd/pinchDist)));}
+pinchDist=nd;
+}
+},{passive:false});
+mapWrap.addEventListener('touchend',e=>{
+if(!drag.moved&&drag.on&&e.changedTouches.length){
+const t=e.changedTouches[0];
+const rect=mapWrap.getBoundingClientRect();
+const mx=t.clientX-rect.left,my=t.clientY-rect.top;
+const wx=mx/cam.z-cam.x,wy=my/cam.z-cam.y;
+for(const a of agents){if(Math.hypot(wx-a.x-3,wy-a.y+3)<18){
+if(followId===a.id){exitFollow();}else{startFollow(a.id);}drag.on=false;return;}}
+for(const b of buildings){if(b.phase===6&&wx>=b.x-6&&wx<=b.x+b.w+6&&wy>=b.y-6&&wy<=b.y+b.h+6){
+enterApartment(b);drag.on=false;return;}}
+}
+drag.on=false;pinchDist=0;
+},{passive:false});
+// ── FOLLOW MODE ──
+function startFollow(id){
+const ag=agents.find(a=>a.id===id);if(!ag)return;
+followId=id;mode='follow';cam.z=1.6;
+$('modeBadge').textContent='FOLLOW';$('modeBadge').style.color=C.cyan;
+$('fpName').textContent='◆ '+ag.name;$('fpName').style.color=ag.c;
+$('fpSub').textContent=ag.rank+' · '+DISTRICTS[ag.di].n;
+$('fpRep').textContent=ag.rep.toLocaleString();$('fpBuilds').textContent=ag.builds;
+$('fpStatus').textContent=ag.status.toUpperCase();
+$('followPanel').classList.add('show');
+notify('Following '+ag.name);
+}
+function exitFollow(){
+followId=null;mode='city';cam.z=1;
+$('modeBadge').textContent='EXPLORE';$('modeBadge').style.color=C.accent;
+$('followPanel').classList.remove('show');
+notify('Camera released');
+}
+$('fpClose').addEventListener('click',exitFollow);
+$('fpApt').addEventListener('click',()=>{
+if(followId===null)return;const ag=agents.find(a=>a.id===followId);if(!ag)return;
+const b=buildings.find(x=>x.owner===ag.name&&x.phase===6);
+if(b){enterApartment(b);}else{notify('No apartment found');}
+});
+// ── AGENT LIST ──
+function buildAgentList(){
+const body=$('alBody');body.innerHTML='';
+$('alCount').textContent=agents.length;
+agents.forEach(a=>{
+const row=document.createElement('div');row.className='al-row';
+row.innerHTML='<span style="color:'+a.c+'">◆</span><div><div class="al-name">'+a.name+'</div><div class="al-rank">'+a.rank+'</div></div>';
+row.addEventListener('click',()=>{startFollow(a.id);$('agentList').classList.remove('show');});
+body.appendChild(row);
+});
+}
+buildAgentList();
+// ── APARTMENT ──
+function enterApartment(b){
+selBld=b;mode='apartment';
+$('modeBadge').textContent='APARTMENT';$('modeBadge').style.color=C.gold;
+$('aptName').textContent=b.name;$('aptSub').textContent='Owner: '+b.owner+' · '+b.floors+' floors';
+$('aptView').classList.add('show');
+renderApt();
+notify('Entering '+b.name);
+}
+function exitApartment(){
+selBld=null;mode=followId!==null?'follow':'city';
+$('modeBadge').textContent=followId!==null?'FOLLOW':'EXPLORE';
+$('modeBadge').style.color=followId!==null?C.cyan:C.accent;
+$('aptView').classList.remove('show');$('catalog').classList.remove('show');
+notify('Exited');
+}
+$('aptExit').addEventListener('click',exitApartment);
+$('aptFurnish').addEventListener('click',()=>$('catalog').classList.toggle('show'));
+function renderApt(){
+const s=STYLES[aptStyle];
+$('aptView').style.background=s.bg;
+$('aptFloor').style.background=s.floor;$('aptFloor').style.borderColor=s.wall;
+$('aptGrid').style.backgroundImage='linear-gradient('+s.wall+'18 1px,transparent 1px),linear-gradient(90deg,'+s.wall+'18 1px,transparent 1px)';
+$('aptWallTop').textContent='═'.repeat(32);$('aptWallTop').style.color=s.wall;
+$('aptWallBot').textContent='═'.repeat(13)+' ▯▯ '+'═'.repeat(13);$('aptWallBot').style.color=s.wall;
+$('aptWindow').textContent='╡ ░░░░ ╞';$('aptWindow').style.color=s.ac;
+// Furniture
+const cont=$('aptFurnItems');cont.innerHTML='';
+aptFurn.forEach((f,i)=>{
+const fd=FURN.find(x=>x.id===f.fid);if(!fd)return;
+const el=document.createElement('div');el.className='furn-item';
+el.style.left=f.x*20+'px';el.style.top=f.y*20+'px';
+el.innerHTML='<pre style="color:'+fd.color+'">'+fd.icon+'</pre><div class="furn-label">'+fd.name+'</div>';
+// Drag (mouse + touch)
+el.addEventListener('mousedown',e=>{
+e.stopPropagation();
+const sx=e.clientX,sy=e.clientY,fx=f.x,fy=f.y;
+const mv=ev=>{
+const dx=Math.round((ev.clientX-sx)/20),dy=Math.round((ev.clientY-sy)/20);
+aptFurn[i]={...aptFurn[i],x:Math.max(0,Math.min(14,fx+dx)),y:Math.max(0,Math.min(10,fy+dy))};
+el.style.left=aptFurn[i].x*20+'px';el.style.top=aptFurn[i].y*20+'px';
+};
+const up=()=>{window.removeEventListener('mousemove',mv);window.removeEventListener('mouseup',up);};
+window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up);
+});
+el.addEventListener('touchstart',te=>{
+te.stopPropagation();te.preventDefault();
+const t0=te.touches[0],sx=t0.clientX,sy=t0.clientY,fx=f.x,fy=f.y;
+const tmv=tv=>{
+tv.preventDefault();const tt=tv.touches[0];
+const dx=Math.round((tt.clientX-sx)/20),dy=Math.round((tt.clientY-sy)/20);
+aptFurn[i]={...aptFurn[i],x:Math.max(0,Math.min(12,fx+dx)),y:Math.max(0,Math.min(9,fy+dy))};
+el.style.left=aptFurn[i].x*20+'px';el.style.top=aptFurn[i].y*20+'px';
+};
+const tup=()=>{window.removeEventListener('touchmove',tmv);window.removeEventListener('touchend',tup);};
+window.addEventListener('touchmove',tmv,{passive:false});window.addEventListener('touchend',tup);
+},{passive:false});
+cont.appendChild(el);
+});
+// Catalog
+const ci=$('catItems');ci.innerHTML='';
+FURN.forEach(f=>{
+const el=document.createElement('div');el.className='cat-item';
+el.innerHTML='<pre style="color:'+f.color+'">'+f.icon+'</pre><div class="cn">'+f.name+'</div>';
+el.addEventListener('click',()=>{aptFurn.push({fid:f.id,x:7,y:5});renderApt();notify('Added '+f.name);});
+ci.appendChild(el);
+});
+const cs=$('catStyles');cs.innerHTML='';
+STYLES.forEach((s2,i)=>{
+const el=document.createElement('button');el.className='style-btn'+(aptStyle===i?' active':'');
+el.textContent=s2.name;
+el.addEventListener('click',()=>{aptStyle=i;renderApt();});
+cs.appendChild(el);
+});
+}
+$('catClear').addEventListener('click',()=>{aptFurn=[];renderApt();notify('Cleared');});
+// ── CONTROLS ──
+$('btnNight').addEventListener('click',()=>{
+night=!night;
+$('btnNight').textContent=night?'☀ DAY':'🌙 NIGHT';
+$('badgeCycle').textContent='CYCLE: '+(night?'NIGHT':'DAY');
+});
+$('btnWeather').addEventListener('click',()=>{
+weather=weather==='clear'?'rain':weather==='rain'?'snow':'clear';
+$('btnWeather').textContent=weather==='clear'?'🌧 RAIN':weather==='rain'?'❄ SNOW':'☀ CLEAR';
+$('badgeWeather').textContent=weather.toUpperCase();
+wParticles=[];
+if(weather==='rain')for(let i=0;i<60;i++)wParticles.push({x:Math.random()*1500-300,y:Math.random()*1200,s:2+Math.random()*4,sp:3+Math.random()*5});
+if(weather==='snow')for(let i=0;i<30;i++)wParticles.push({x:Math.random()*1500-300,y:Math.random()*1200,s:1+Math.random()*1.5,sp:0.3+Math.random()*0.6,dr:Math.random()*2-1});
+});
+$('btnAgents').addEventListener('click',()=>$('agentList').classList.toggle('show'));
+$('btnReset').addEventListener('click',()=>{cam.x=-80+W/2;cam.y=-300+H/2;cam.z=1;});
+$('zoomIn').addEventListener('click',()=>{cam.z=Math.min(3.5,cam.z*1.25);});
+$('zoomOut').addEventListener('click',()=>{cam.z=Math.max(0.35,cam.z/1.25);});
+</script>
+</body>
+</html>
